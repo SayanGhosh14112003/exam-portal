@@ -16,7 +16,7 @@ const OperatorIDModal = ({ isOpen, onClose, onVerificationComplete }) => {
     setStep(2);
   };
 
-  const handleVerification = () => {
+  const handleVerification = async () => {
     if (!secondId.trim()) {
       setError('Please re-enter your operator ID');
       return;
@@ -24,10 +24,9 @@ const OperatorIDModal = ({ isOpen, onClose, onVerificationComplete }) => {
 
     setIsLoading(true);
     
-    // Simulate processing delay
-    setTimeout(() => {
+    try {
       if (firstId.trim() === secondId.trim()) {
-        // Case A: IDs Match
+        // Case A: IDs Match - Proceed directly to rules page
         setError('');
         onVerificationComplete(firstId.trim());
         handleClose();
@@ -42,8 +41,16 @@ const OperatorIDModal = ({ isOpen, onClose, onVerificationComplete }) => {
           setError('');
         }, 2000);
       }
+    } catch (error) {
+      console.error('❌ Error during verification process:', error);
+      // Don't block user flow - continue with verification
+      if (firstId.trim() === secondId.trim()) {
+        onVerificationComplete(firstId.trim());
+        handleClose();
+      }
+    } finally {
       setIsLoading(false);
-    }, 500);
+    }
   };
 
   const handleClose = () => {

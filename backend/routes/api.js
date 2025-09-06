@@ -160,4 +160,36 @@ router.post('/responses', async (req, res) => {
   }
 });
 
+// Process video links - convert Drive_Link to Api_Drive_Link when empty
+router.post('/process-video-links', async (req, res) => {
+  try {
+    console.log('🔄 API: Processing video links...');
+    
+    const { force } = req.body; // Allow forcing regeneration
+    
+    let result;
+    if (force) {
+      result = await sheetsService.forceProcessVideoLinks();
+    } else {
+      result = await sheetsService.processVideoLinks();
+    }
+    
+    res.json({
+      success: true,
+      message: 'Video links processed successfully',
+      processed: result.processed,
+      updated: result.updated,
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error('❌ Error processing video links:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to process video links',
+      message: error.message
+    });
+  }
+});
+
 module.exports = router;

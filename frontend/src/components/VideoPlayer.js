@@ -8,11 +8,13 @@ const VideoPlayer = ({ operatorId, onExamComplete }) => {
   const [error, setError] = useState('');
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
+  const [videoDuration, setVideoDuration] = useState(0);
   const [videoStartTime, setVideoStartTime] = useState(null);
   const [responses, setResponses] = useState([]);
   const [sessionId] = useState(`session_${Date.now()}`);
   const [showResponse, setShowResponse] = useState(null);
   const [spacebarPressed, setSpacebarPressed] = useState(false);
+  const [showNextButton, setShowNextButton] = useState(false);
 
   const videoRef = useRef(null);
   const spacebarPressTime = useRef(null);
@@ -83,12 +85,18 @@ const VideoPlayer = ({ operatorId, onExamComplete }) => {
       handleVideoComplete();
     };
 
+    const handleLoadedMetadata = () => {
+      setVideoDuration(video.duration || 120); // Fallback to 120 seconds if duration not available
+    };
+
     video.addEventListener('timeupdate', handleTimeUpdate);
     video.addEventListener('ended', handleVideoEnd);
+    video.addEventListener('loadedmetadata', handleLoadedMetadata);
 
     return () => {
       video.removeEventListener('timeupdate', handleTimeUpdate);
       video.removeEventListener('ended', handleVideoEnd);
+      video.removeEventListener('loadedmetadata', handleLoadedMetadata);
     };
   }, [currentVideoIndex]);
 
@@ -119,6 +127,7 @@ const VideoPlayer = ({ operatorId, onExamComplete }) => {
     
     spacebarPressTime.current = videoTime;
     hasUserResponded.current = true;
+    setShowNextButton(true); // Show Next button after spacebar press
 
     console.log(`🔘 Spacebar pressed at video time: ${videoTime.toFixed(2)}s`);
     
@@ -142,6 +151,7 @@ const VideoPlayer = ({ operatorId, onExamComplete }) => {
         hasUserResponded.current = false;
         spacebarPressTime.current = null;
         setCurrentTime(0);
+        setVideoDuration(120); // Set 2-minute duration for Google Drive videos
         
         console.log(`▶️ Started Google Drive video: ${currentVideo?.videoTitle}`);
         
@@ -185,6 +195,7 @@ const VideoPlayer = ({ operatorId, onExamComplete }) => {
       hasUserResponded.current = false;
       spacebarPressTime.current = null;
       setCurrentTime(0);
+      setVideoDuration(20); // Set 20-second duration for demo mode
       
       console.log(`▶️ Started demo: ${currentVideo?.videoTitle}`);
       
@@ -205,6 +216,7 @@ const VideoPlayer = ({ operatorId, onExamComplete }) => {
       window.demoInterval = demoInterval;
     }
   };
+
 
   const handleVideoComplete = () => {
     setIsPlaying(false);
@@ -237,7 +249,13 @@ const VideoPlayer = ({ operatorId, onExamComplete }) => {
     setShowResponse({ type: 'result', ...result });
     setTimeout(() => {
       setShowResponse(null);
-      moveToNextVideo();
+      // Auto-advance only if spacebar was pressed
+      if (hasUserResponded.current) {
+        moveToNextVideo();
+      } else {
+        // If no spacebar press, show Next button for manual progression
+        setShowNextButton(true);
+      }
     }, 2000);
   };
 
@@ -310,10 +328,12 @@ const VideoPlayer = ({ operatorId, onExamComplete }) => {
     if (currentVideoIndex < videos.length - 1) {
       setCurrentVideoIndex(prev => prev + 1);
       setCurrentTime(0);
+      setVideoDuration(0);
       setIsPlaying(false);
       hasUserResponded.current = false;
       spacebarPressTime.current = null;
       setShowResponse(null);
+      setShowNextButton(false);
     } else {
       // Exam complete
       handleExamComplete();
@@ -341,6 +361,15 @@ const VideoPlayer = ({ operatorId, onExamComplete }) => {
 
   const getCurrentVideo = () => videos[currentVideoIndex];
   const currentVideo = getCurrentVideo();
+
+  // Helper function to format time in mm:ss format
+  const formatTime = (timeInSeconds) => {
+    if (!timeInSeconds || timeInSeconds === 0) return '0:00';
+    const minutes = Math.floor(timeInSeconds / 60);
+    const seconds = Math.floor(timeInSeconds % 60);
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  };
+
 
   // Focus management for better spacebar detection
   useEffect(() => {
@@ -414,9 +443,6 @@ const VideoPlayer = ({ operatorId, onExamComplete }) => {
         <div className="flex justify-between items-center">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Video Intervention Assessment</h1>
-            <p className="text-gray-600 mt-1">
-              Operator: <span className="font-medium text-primary-600">{operatorId}</span>
-            </p>
           </div>
           <div className="text-right">
             <div className="text-sm text-gray-500">Progress</div>
@@ -446,7 +472,6 @@ const VideoPlayer = ({ operatorId, onExamComplete }) => {
               <h2 className="text-xl font-semibold text-gray-800 mb-2">
                 {currentVideo.videoTitle || `Video ${currentVideoIndex + 1}`}
               </h2>
-              <p className="text-gray-600">Clip ID: {currentVideo.clipId}</p>
             </div>
 
             {/* Video Element */}
@@ -457,13 +482,17 @@ const VideoPlayer = ({ operatorId, onExamComplete }) => {
                   <div className="relative w-full h-full bg-black">
                     <iframe
                       ref={videoRef}
-                      src={`${currentVideo.driveLink}${currentVideo.driveLink.includes('?') ? '&' : '?'}autoplay=1&controls=0&modestbranding=1&rel=0&showinfo=0&disablekb=1&fs=0&iv_load_policy=3`}
+                      src={currentVideo.driveLink}
                       className="w-full h-full"
                       frameBorder="0"
                       allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                       allowFullScreen
                       title={currentVideo.videoTitle}
                       style={{ pointerEvents: isPlaying ? 'none' : 'auto' }}
+                      onLoad={() => {
+                        console.log(`✅ Iframe loaded: ${currentVideo.videoTitle}`);
+                      }}
+                      onError={() => console.error(`❌ Iframe error: ${currentVideo.videoTitle}`)}
                     />
                     
                     {/* Invisible overlay to capture clicks and prevent focus issues */}
@@ -477,43 +506,107 @@ const VideoPlayer = ({ operatorId, onExamComplete }) => {
                     
                     {/* Timer overlay for Google Drive videos */}
                     {isPlaying && (
-                      <div className="absolute top-4 right-4 bg-black bg-opacity-90 text-white px-4 py-2 rounded-lg text-lg font-mono shadow-lg">
-                        {Math.floor(currentTime / 60)}:{(currentTime % 60).toFixed(0).padStart(2, '0')}
+                      <div className="absolute top-4 right-4 bg-black bg-opacity-75 text-white px-3 py-1 rounded text-sm font-mono">
+                        {formatTime(currentTime)} / {formatTime(videoDuration)}
                       </div>
                     )}
                     
-                    {/* Play button overlay for initial start */}
+                    {/* Assessment running overlay */}
+                    {isPlaying && (
+                      <div className="absolute top-4 left-4 bg-red-600 bg-opacity-90 text-white px-4 py-2 rounded-lg text-sm font-semibold shadow-lg animate-pulse">
+                        🔴 ASSESSMENT ACTIVE
+                      </div>
+                    )}
+                    
+                    
+                    {/* Manual start button for Google Drive videos */}
                     {!isPlaying && (
-                      <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50">
-                        <button
-                          onClick={startVideo}
-                          className="bg-primary-600 hover:bg-primary-700 text-white rounded-full p-6 shadow-2xl transition-all duration-200 hover:scale-110"
-                        >
-                          <svg className="w-12 h-12" fill="currentColor" viewBox="0 0 20 20">
-                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
-                          </svg>
-                        </button>
+                      <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-80">
+                        <div className="text-center max-w-md mx-4">
+                          <div className="bg-blue-600 text-white px-6 py-4 rounded-lg mb-6">
+                            <h3 className="text-lg font-bold mb-2">📹 Video Assessment Instructions</h3>
+                            <ol className="text-sm text-left space-y-2">
+                              <li>1. <strong>Click "Open Video"</strong> to view the video in a new tab</li>
+                              <li>2. <strong>Watch the video</strong> in the new tab (keep this tab open)</li>
+                              <li>3. <strong>Return here</strong> and click "Start Assessment"</li>
+                              <li>4. <strong>Press SPACEBAR</strong> when you see an intervention needed</li>
+                            </ol>
+                          </div>
+                          
+                          <div className="flex space-x-4 justify-center">
+                            <a
+                              href={currentVideo.originalDriveLink || currentVideo.driveLink}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold transition-all duration-200 hover:scale-105"
+                            >
+                              🔗 Open Video
+                            </a>
+                            <button
+                              onClick={startVideo}
+                              className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-semibold transition-all duration-200 hover:scale-105"
+                            >
+                              ▶️ Start Assessment
+                            </button>
+                          </div>
+                          
+                          <p className="text-white text-sm mt-4 opacity-80">
+                            Assessment duration: {formatTime(videoDuration) || '2 minutes'}
+                          </p>
+                        </div>
                       </div>
                     )}
                     
                     {/* Instruction overlay */}
                     <div className="absolute bottom-4 left-4 right-4 bg-black bg-opacity-90 text-white px-6 py-3 rounded-lg text-center shadow-lg">
-                      <p className="text-lg font-semibold">
-                        <span className="text-yellow-300">⚡ Press SPACEBAR</span> when you believe an intervention is needed
-                      </p>
+                      {isPlaying ? (
+                        <div>
+                          <p className="text-lg font-semibold mb-1">
+                            <span className="text-yellow-300">⚡ Press SPACEBAR</span> when you believe an intervention is needed
+                          </p>
+                          <p className="text-sm opacity-80">
+                            💡 Watch the video in the other tab while keeping this tab active for spacebar input
+                          </p>
+                        </div>
+                      ) : (
+                        <p className="text-lg font-semibold">
+                          <span className="text-yellow-300">⚡ Press SPACEBAR</span> when you believe an intervention is needed
+                        </p>
+                      )}
                     </div>
                   </div>
                 ) : (
-                  // Regular video file
-                  <video
-                    ref={videoRef}
-                    className="w-full h-full"
-                    controls={false}
-                    preload="metadata"
-                  >
-                    <source src={currentVideo.driveLink} type="video/mp4" />
-                    Your browser does not support the video tag.
-                  </video>
+                  // Regular video file (Firebase/other direct URLs)
+                  <div className="relative w-full h-full bg-black">
+                    <video
+                      ref={videoRef}
+                      className="w-full h-full"
+                      controls={false}
+                      preload="metadata"
+                    >
+                      <source src={currentVideo.driveLink} type="video/mp4" />
+                      Your browser does not support the video tag.
+                    </video>
+                    
+                    {/* Start button for Firebase videos */}
+                    {!isPlaying && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-70">
+                        <button
+                          onClick={startVideo}
+                          className="bg-green-600 hover:bg-green-700 text-white px-8 py-4 rounded-lg text-xl font-semibold shadow-2xl transition-all duration-200 hover:scale-105"
+                        >
+                          ▶️ Start Video Assessment
+                        </button>
+                      </div>
+                    )}
+                    
+                    {/* Video Duration Display */}
+                    {isPlaying && (
+                      <div className="absolute top-4 right-4 bg-black bg-opacity-75 text-white px-3 py-1 rounded text-sm font-mono">
+                        {formatTime(currentTime)} / {formatTime(videoDuration)}
+                      </div>
+                    )}
+                  </div>
                 )
               ) : (
                 <div className="flex items-center justify-center h-full text-white bg-gradient-to-br from-gray-800 to-gray-900">
@@ -574,18 +667,18 @@ const VideoPlayer = ({ operatorId, onExamComplete }) => {
             <div className="flex justify-between items-center">
               <div className="flex items-center space-x-4">
                 {!isPlaying ? (
-                  <div className="flex items-center text-blue-600 bg-blue-50 px-4 py-2 rounded-lg border border-blue-200">
+                  <div className="flex items-center text-green-600 bg-green-50 px-4 py-2 rounded-lg border border-green-200">
                     <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
                     </svg>
-                    <span className="font-medium">Click the play button on the video to start</span>
+                    <span className="font-medium">Ready to start</span>
                   </div>
                 ) : (
                   <div className="flex items-center text-green-600 bg-green-50 px-4 py-2 rounded-lg border border-green-200">
                     <div className="w-3 h-3 bg-green-500 rounded-full mr-3 animate-pulse"></div>
                     <span className="font-bold">RECORDING</span>
                     <span className="ml-2 font-mono text-lg">
-                      {Math.floor(currentTime / 60)}:{(currentTime % 60).toFixed(0).padStart(2, '0')}
+                      {formatTime(currentTime)} / {formatTime(videoDuration)}
                     </span>
                   </div>
                 )}
@@ -610,23 +703,50 @@ const VideoPlayer = ({ operatorId, onExamComplete }) => {
                   <p className="text-xs text-green-600 mt-1">✓ Response recorded this video</p>
                 )}
               </div>
+
+              <div className="text-right">
+                {showNextButton && (
+                  <button
+                    onClick={moveToNextVideo}
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold transition-all duration-200 hover:scale-105 shadow-lg"
+                  >
+                    Next Video →
+                  </button>
+                )}
+              </div>
             </div>
           </>
         )}
       </div>
 
-      {/* Instructions Reminder */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-        <div className="flex items-center space-x-3">
-          <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-          <p className="text-blue-800">
-            <strong>Remember:</strong> Press SPACEBAR when you believe an intervention is needed. 
-            You have ±1.5 seconds from the correct time.
+      {/* Instructions - Only show for first video and before it starts */}
+      {currentVideoIndex === 0 && !isPlaying && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 mb-4">
+          <div className="flex items-start space-x-3">
+            <svg className="w-6 h-6 text-yellow-600 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <div>
+              <h3 className="text-lg font-semibold text-yellow-800 mb-2">Assessment Instructions</h3>
+              <ul className="text-yellow-800 space-y-1 text-sm">
+                <li>• <strong>Press SPACEBAR</strong> when you believe an intervention is needed</li>
+                <li>• You have <strong>±1.5 seconds</strong> from the correct intervention time</li>
+                <li>• Each video is approximately <strong>2 minutes</strong> long</li>
+                <li>• The assessment will automatically progress to the next video</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Simple instruction reminder during exam */}
+      {isPlaying && (
+        <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-center">
+          <p className="text-gray-700 text-sm">
+            ⚡ <strong>Press SPACEBAR</strong> when intervention needed • <strong>±1.5s</strong> response window
           </p>
         </div>
-      </div>
+      )}
     </div>
   );
 };
