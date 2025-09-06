@@ -73,58 +73,106 @@ const VideoPlayer = ({ operatorId, onExamComplete }) => {
   }, [isPlaying, videoStartTime]); // Dependencies updated
 
   // Video time update listener
-  useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
+  // useEffect(() => {
+  //   const video = videoRef.current;
+  //   if (!video) return;
 
-    const handleTimeUpdate = () => {
-      setCurrentTime(video.currentTime);
-    };
+  //   const handleTimeUpdate = () => {
+  //     setCurrentTime(video.currentTime);
+  //   };
 
-    const handleVideoEnd = () => {
-      handleVideoComplete();
-    };
+  //   const handleVideoEnd = () => {
+  //     handleVideoComplete();
+  //   };
 
-    const handleLoadedMetadata = () => {
-      setVideoDuration(video.duration || 120); // Fallback to 120 seconds if duration not available
-    };
+  //   const handleLoadedMetadata = () => {
+  //     setVideoDuration(video.duration || 120); // Fallback to 120 seconds if duration not available
+  //   };
 
-    video.addEventListener('timeupdate', handleTimeUpdate);
-    video.addEventListener('ended', handleVideoEnd);
-    video.addEventListener('loadedmetadata', handleLoadedMetadata);
+  //   video.addEventListener('timeupdate', handleTimeUpdate);
+  //   video.addEventListener('ended', handleVideoEnd);
+  //   video.addEventListener('loadedmetadata', handleLoadedMetadata);
 
-    return () => {
-      video.removeEventListener('timeupdate', handleTimeUpdate);
-      video.removeEventListener('ended', handleVideoEnd);
-      video.removeEventListener('loadedmetadata', handleLoadedMetadata);
-    };
-  }, [currentVideoIndex]);
+  //   return () => {
+  //     video.removeEventListener('timeupdate', handleTimeUpdate);
+  //     video.removeEventListener('ended', handleVideoEnd);
+  //     video.removeEventListener('loadedmetadata', handleLoadedMetadata);
+  //   };
+  // }, [currentVideoIndex]);
 
 
 
-// new added
 
-// Actively update currentTime via requestAnimationFrame
+// new updated version 1:
+
 useEffect(() => {
-  let animationFrameId;
+  const video = videoRef.current;
+  if (!video) return;
 
-  const updateCurrentTime = () => {
-    if (isPlaying && videoRef.current) {
-      setCurrentTime(videoRef.current.currentTime);
-      animationFrameId = requestAnimationFrame(updateCurrentTime);
-    }
+  const handleTimeUpdate = () => {
+    setCurrentTime(video.currentTime);
   };
 
-  if (isPlaying) {
-    animationFrameId = requestAnimationFrame(updateCurrentTime);
-  }
+  const handleVideoEnd = () => {
+    handleVideoComplete();
+  };
+
+  const handleLoadedMetadata = () => {
+    const duration = video.duration || 120;
+    setVideoDuration(duration);
+    console.log('📏 Metadata loaded, duration =', duration);
+
+    // ✅ Try autoplay
+    video.play().then(() => {
+      console.log('▶️ Auto-play started');
+      setIsPlaying(true);
+      setVideoStartTime(Date.now());
+    }).catch(err => {
+      console.warn('🔇 Auto-play failed:', err);
+    });
+  };
+
+  video.addEventListener('timeupdate', handleTimeUpdate);
+  video.addEventListener('ended', handleVideoEnd);
+  video.addEventListener('loadedmetadata', handleLoadedMetadata);
 
   return () => {
-    if (animationFrameId) {
-      cancelAnimationFrame(animationFrameId);
-    }
+    video.removeEventListener('timeupdate', handleTimeUpdate);
+    video.removeEventListener('ended', handleVideoEnd);
+    video.removeEventListener('loadedmetadata', handleLoadedMetadata);
   };
-}, [isPlaying]);
+}, [currentVideoIndex]);
+
+
+
+
+
+
+
+
+  // new added
+
+  // Actively update currentTime via requestAnimationFrame
+  useEffect(() => {
+    let animationFrameId;
+
+    const updateCurrentTime = () => {
+      if (isPlaying && videoRef.current) {
+        setCurrentTime(videoRef.current.currentTime);
+        animationFrameId = requestAnimationFrame(updateCurrentTime);
+      }
+    };
+
+    if (isPlaying) {
+      animationFrameId = requestAnimationFrame(updateCurrentTime);
+    }
+
+    return () => {
+      if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
+      }
+    };
+  }, [isPlaying]);
 
 
 
@@ -650,8 +698,27 @@ useEffect(() => {
                     </video> */
 
 
-                      // new changed version
+                      // new changed version 1
+                      // <video
+                      //   ref={videoRef}
+                      //   className="w-full h-full"
+                      //   controls={false}
+                      //   preload="metadata"
+                      //   onLoadedMetadata={(e) => {
+                      //     const duration = e.target.duration;
+                      //     console.log('📏 Metadata loaded, duration =', duration);
+                      //     setVideoDuration(duration || 120); // fallback
+                      //   }}
+                      // >
+                      //   <source src={currentVideo.driveLink} type="video/mp4" />
+                      //   Your browser does not support the video tag.
+                      // </video>
+
+
+
+                      // new changed version 2
                       <video
+                        key={currentVideo.clipId}
                         ref={videoRef}
                         className="w-full h-full"
                         controls={false}
@@ -665,6 +732,12 @@ useEffect(() => {
                         <source src={currentVideo.driveLink} type="video/mp4" />
                         Your browser does not support the video tag.
                       </video>
+
+
+
+
+
+
 
 
                     }
