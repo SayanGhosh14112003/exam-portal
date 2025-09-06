@@ -94,12 +94,17 @@ class GoogleSheetsService {
           const fireBaseLink = row[6] || ''; // Fire_Base_Link column (G)
           const originalDriveLink = row[5] || ''; // Drive_Link column (F)
           
-          if (fireBaseLink.trim()) {
-            // Use Firebase video link
+          // Check if the Drive_Link column contains Firebase URLs (common case)
+          if (originalDriveLink.includes('firebasestorage.googleapis.com')) {
+            // Drive_Link column actually contains Firebase URL
+            videoUrl = originalDriveLink.trim();
+            console.log(`🔥 Using Firebase URL from Drive_Link for ${row[0]}: Firebase video URL`);
+          } else if (fireBaseLink.trim() && fireBaseLink !== '1' && fireBaseLink !== '2' && fireBaseLink !== '3') {
+            // Use Fire_Base_Link if it's not just a placeholder number
             videoUrl = fireBaseLink.trim();
             console.log(`🔥 Using Fire_Base_Link for ${row[0]}: Firebase video URL`);
-          } else if (originalDriveLink.trim()) {
-            // Fall back to Drive_Link and convert to preview URL
+          } else if (originalDriveLink.trim() && originalDriveLink !== '1' && originalDriveLink !== '2' && originalDriveLink !== '3') {
+            // Fall back to Drive_Link and convert to preview URL if it's not a placeholder
             videoUrl = originalDriveLink.trim();
             if (videoUrl.includes('drive.google.com')) {
               // Extract file ID from Google Drive URL
@@ -112,7 +117,7 @@ class GoogleSheetsService {
             }
             console.log(`⚠️ Using Drive_Link for ${row[0]}: Fire_Base_Link not available`);
           } else {
-            console.warn(`❌ No video URL found for ${row[0]}: Both Fire_Base_Link and Drive_Link are empty`);
+            console.warn(`❌ No valid video URL found for ${row[0]}: Both Fire_Base_Link and Drive_Link are empty or contain placeholder values`);
           }
           
           return {
