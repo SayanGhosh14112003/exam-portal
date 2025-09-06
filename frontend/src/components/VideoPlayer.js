@@ -23,7 +23,7 @@ const VideoPlayer = ({ operatorId, onExamComplete }) => {
   // Fetch videos on component mount
   useEffect(() => {
     fetchVideos();
-    
+
     // Cleanup intervals on unmount
     return () => {
       if (window.videoInterval) {
@@ -63,7 +63,7 @@ const VideoPlayer = ({ operatorId, onExamComplete }) => {
     document.addEventListener('keyup', handleKeyUp, true);
     window.addEventListener('keydown', handleKeyDown, true);
     window.addEventListener('keyup', handleKeyUp, true);
-    
+
     return () => {
       document.removeEventListener('keydown', handleKeyDown, true);
       document.removeEventListener('keyup', handleKeyUp, true);
@@ -100,11 +100,45 @@ const VideoPlayer = ({ operatorId, onExamComplete }) => {
     };
   }, [currentVideoIndex]);
 
+
+
+// new added
+
+// Actively update currentTime via requestAnimationFrame
+useEffect(() => {
+  let animationFrameId;
+
+  const updateCurrentTime = () => {
+    if (isPlaying && videoRef.current) {
+      setCurrentTime(videoRef.current.currentTime);
+      animationFrameId = requestAnimationFrame(updateCurrentTime);
+    }
+  };
+
+  if (isPlaying) {
+    animationFrameId = requestAnimationFrame(updateCurrentTime);
+  }
+
+  return () => {
+    if (animationFrameId) {
+      cancelAnimationFrame(animationFrameId);
+    }
+  };
+}, [isPlaying]);
+
+
+
+
+
+
+
+
+
   const fetchVideos = async () => {
     try {
       setIsLoading(true);
       const response = await axios.get('/api/videos');
-      
+
       if (response.data.success) {
         setVideos(response.data.videos);
         console.log('📹 Loaded videos:', response.data.videos);
@@ -124,25 +158,32 @@ const VideoPlayer = ({ operatorId, onExamComplete }) => {
 
     const pressTime = Date.now();
     const videoTime = (pressTime - videoStartTime) / 1000; // Convert to seconds
-    
+
     spacebarPressTime.current = videoTime;
     hasUserResponded.current = true;
     setShowNextButton(true); // Show Next button after spacebar press
 
     console.log(`🔘 Spacebar pressed at video time: ${videoTime.toFixed(2)}s`);
-    
+
     // Show immediate visual feedback
-    setShowResponse({ 
-      type: 'press', 
+    setShowResponse({
+      type: 'press',
       time: videoTime,
       message: 'Intervention Recorded!'
     });
     setTimeout(() => setShowResponse(null), 1500);
   };
 
-  const startVideo = () => {
+  // const startVideo = () => {
+
+  //new modified version
+  const startVideo = async () => {
+
+
+
+
     const currentVideo = getCurrentVideo();
-    
+
     if (currentVideo?.driveLink) {
       if (currentVideo.driveLink.includes('drive.google.com')) {
         // Google Drive video - simulate playback with overlay control
@@ -152,15 +193,15 @@ const VideoPlayer = ({ operatorId, onExamComplete }) => {
         spacebarPressTime.current = null;
         setCurrentTime(0);
         setVideoDuration(120); // Set 2-minute duration for Google Drive videos
-        
+
         console.log(`▶️ Started Google Drive video: ${currentVideo?.videoTitle}`);
-        
+
         // Ensure focus stays on document for spacebar detection
         setTimeout(() => {
           document.body.focus();
           document.activeElement?.blur();
         }, 100);
-        
+
         // Simulate 2-minute video playback (120 seconds)
         const videoInterval = setInterval(() => {
           setCurrentTime(prevTime => {
@@ -173,7 +214,7 @@ const VideoPlayer = ({ operatorId, onExamComplete }) => {
             return newTime;
           });
         }, 100);
-        
+
         // Store interval reference for cleanup
         window.videoInterval = videoInterval;
       } else {
@@ -184,7 +225,27 @@ const VideoPlayer = ({ operatorId, onExamComplete }) => {
           setIsPlaying(true);
           hasUserResponded.current = false;
           spacebarPressTime.current = null;
-          video.play();
+          //  video.play();
+
+          // updated version:
+          try {
+            await video.play();
+            setIsPlaying(true);
+            setVideoStartTime(Date.now());
+            hasUserResponded.current = false;
+            spacebarPressTime.current = null;
+            console.log(`▶️ Started video: ${currentVideo?.videoTitle}`);
+          } catch (err) {
+            console.error('❌ Error starting video:', err);
+          }
+
+
+
+
+
+
+
+
           console.log(`▶️ Started video: ${currentVideo?.videoTitle}`);
         }
       }
@@ -196,9 +257,9 @@ const VideoPlayer = ({ operatorId, onExamComplete }) => {
       spacebarPressTime.current = null;
       setCurrentTime(0);
       setVideoDuration(20); // Set 20-second duration for demo mode
-      
+
       console.log(`▶️ Started demo: ${currentVideo?.videoTitle}`);
-      
+
       // Simulate 20-second video playback
       const demoInterval = setInterval(() => {
         setCurrentTime(prevTime => {
@@ -211,7 +272,7 @@ const VideoPlayer = ({ operatorId, onExamComplete }) => {
           return newTime;
         });
       }, 100);
-      
+
       // Store interval reference for cleanup
       window.demoInterval = demoInterval;
     }
@@ -225,7 +286,7 @@ const VideoPlayer = ({ operatorId, onExamComplete }) => {
 
     // Calculate score based on response
     const result = calculateScore(currentVideo);
-    
+
     // Store response
     const response = {
       clipId: currentVideo.clipId,
@@ -269,11 +330,11 @@ const VideoPlayer = ({ operatorId, onExamComplete }) => {
       if (userPressed && pressTime !== null) {
         const timeDiff = pressTime - correctTime;
         const withinWindow = Math.abs(timeDiff) <= 1.5;
-        
+
         return {
           score: withinWindow ? 1 : 0,
           reactionTime: timeDiff,
-          feedback: withinWindow 
+          feedback: withinWindow
             ? `Correct! Reaction time: ${timeDiff > 0 ? '+' : ''}${timeDiff.toFixed(2)}s`
             : `Incorrect timing. Off by ${Math.abs(timeDiff).toFixed(2)}s`
         };
@@ -343,7 +404,7 @@ const VideoPlayer = ({ operatorId, onExamComplete }) => {
   const handleExamComplete = () => {
     const totalScore = responses.reduce((sum, r) => sum + r.score, 0);
     const percentage = ((totalScore / responses.length) * 100).toFixed(1);
-    
+
     console.log('🎯 Exam completed!', {
       totalResponses: responses.length,
       correctResponses: totalScore,
@@ -381,12 +442,12 @@ const VideoPlayer = ({ operatorId, onExamComplete }) => {
           document.activeElement.blur();
         }
       };
-      
+
       focusDocument();
-      
+
       // Re-focus periodically to maintain spacebar detection
       const focusInterval = setInterval(focusDocument, 1000);
-      
+
       return () => clearInterval(focusInterval);
     }
   }, [isPlaying]);
@@ -452,11 +513,11 @@ const VideoPlayer = ({ operatorId, onExamComplete }) => {
             <div className="text-sm text-gray-500">Videos</div>
           </div>
         </div>
-        
+
         {/* Progress Bar */}
         <div className="mt-4">
           <div className="bg-gray-200 rounded-full h-2">
-            <div 
+            <div
               className="bg-primary-600 h-2 rounded-full transition-all duration-300"
               style={{ width: `${((currentVideoIndex + 1) / videos.length) * 100}%` }}
             ></div>
@@ -494,31 +555,31 @@ const VideoPlayer = ({ operatorId, onExamComplete }) => {
                       }}
                       onError={() => console.error(`❌ Iframe error: ${currentVideo.videoTitle}`)}
                     />
-                    
+
                     {/* Invisible overlay to capture clicks and prevent focus issues */}
-                    <div 
+                    <div
                       className="absolute inset-0 bg-transparent cursor-default"
                       style={{ pointerEvents: isPlaying ? 'auto' : 'none' }}
                       onMouseDown={(e) => e.preventDefault()}
                       onFocus={(e) => e.preventDefault()}
                       tabIndex={-1}
                     />
-                    
+
                     {/* Timer overlay for Google Drive videos */}
                     {isPlaying && (
                       <div className="absolute top-4 right-4 bg-black bg-opacity-75 text-white px-3 py-1 rounded text-sm font-mono">
                         {formatTime(currentTime)} / {formatTime(videoDuration)}
                       </div>
                     )}
-                    
+
                     {/* Assessment running overlay */}
                     {isPlaying && (
                       <div className="absolute top-4 left-4 bg-red-600 bg-opacity-90 text-white px-4 py-2 rounded-lg text-sm font-semibold shadow-lg animate-pulse">
                         🔴 ASSESSMENT ACTIVE
                       </div>
                     )}
-                    
-                    
+
+
                     {/* Manual start button for Google Drive videos */}
                     {!isPlaying && (
                       <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-80">
@@ -532,7 +593,7 @@ const VideoPlayer = ({ operatorId, onExamComplete }) => {
                               <li>4. <strong>Press SPACEBAR</strong> when you see an intervention needed</li>
                             </ol>
                           </div>
-                          
+
                           <div className="flex space-x-4 justify-center">
                             <a
                               href={currentVideo.originalDriveLink || currentVideo.driveLink}
@@ -549,14 +610,14 @@ const VideoPlayer = ({ operatorId, onExamComplete }) => {
                               ▶️ Start Assessment
                             </button>
                           </div>
-                          
+
                           <p className="text-white text-sm mt-4 opacity-80">
                             Assessment duration: {formatTime(videoDuration) || '2 minutes'}
                           </p>
                         </div>
                       </div>
                     )}
-                    
+
                     {/* Instruction overlay */}
                     <div className="absolute bottom-4 left-4 right-4 bg-black bg-opacity-90 text-white px-6 py-3 rounded-lg text-center shadow-lg">
                       {isPlaying ? (
@@ -578,7 +639,7 @@ const VideoPlayer = ({ operatorId, onExamComplete }) => {
                 ) : (
                   // Regular video file (Firebase/other direct URLs)
                   <div className="relative w-full h-full bg-black">
-                    <video
+                    {/* <video
                       ref={videoRef}
                       className="w-full h-full"
                       controls={false}
@@ -586,8 +647,28 @@ const VideoPlayer = ({ operatorId, onExamComplete }) => {
                     >
                       <source src={currentVideo.driveLink} type="video/mp4" />
                       Your browser does not support the video tag.
-                    </video>
-                    
+                    </video> */
+
+
+                      // new changed version
+                      <video
+                        ref={videoRef}
+                        className="w-full h-full"
+                        controls={false}
+                        preload="metadata"
+                        onLoadedMetadata={(e) => {
+                          const duration = e.target.duration;
+                          console.log('📏 Metadata loaded, duration =', duration);
+                          setVideoDuration(duration || 120); // fallback
+                        }}
+                      >
+                        <source src={currentVideo.driveLink} type="video/mp4" />
+                        Your browser does not support the video tag.
+                      </video>
+
+
+                    }
+
                     {/* Start button for Firebase videos */}
                     {!isPlaying && (
                       <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-70">
@@ -599,7 +680,7 @@ const VideoPlayer = ({ operatorId, onExamComplete }) => {
                         </button>
                       </div>
                     )}
-                    
+
                     {/* Video Duration Display */}
                     {isPlaying && (
                       <div className="absolute top-4 right-4 bg-black bg-opacity-75 text-white px-3 py-1 rounded text-sm font-mono">
@@ -685,14 +766,12 @@ const VideoPlayer = ({ operatorId, onExamComplete }) => {
               </div>
 
               <div className="text-center">
-                <div className={`border-2 rounded-lg px-6 py-3 mb-2 transition-all duration-150 ${
-                  spacebarPressed 
-                    ? 'bg-green-500 border-green-600 scale-110 shadow-lg' 
-                    : 'bg-red-100 border-red-300'
-                }`}>
-                  <span className={`font-mono text-xl font-bold ${
-                    spacebarPressed ? 'text-white' : 'text-red-800'
+                <div className={`border-2 rounded-lg px-6 py-3 mb-2 transition-all duration-150 ${spacebarPressed
+                  ? 'bg-green-500 border-green-600 scale-110 shadow-lg'
+                  : 'bg-red-100 border-red-300'
                   }`}>
+                  <span className={`font-mono text-xl font-bold ${spacebarPressed ? 'text-white' : 'text-red-800'
+                    }`}>
                     SPACEBAR
                   </span>
                 </div>
