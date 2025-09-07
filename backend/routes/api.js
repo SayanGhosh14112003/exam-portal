@@ -121,7 +121,8 @@ router.post('/responses', async (req, res) => {
       reactionTime, 
       score,
       videoStartTime,
-      sessionId 
+      sessionId,
+      examId 
     } = req.body;
 
     // Validate required fields
@@ -132,7 +133,6 @@ router.post('/responses', async (req, res) => {
       });
     }
 
-    // TODO: Store response in Google Sheets
     console.log('📝 Recording response:', {
       operatorId,
       clipId,
@@ -141,13 +141,28 @@ router.post('/responses', async (req, res) => {
       userPressTime,
       reactionTime,
       score,
+      sessionId,
+      examId,
       timestamp: new Date().toISOString()
+    });
+
+    // Store response in Exam_Results Google Sheet
+    const result = await sheetsService.recordExamResponse({
+      operatorId,
+      clipId,
+      hasIntervention,
+      correctTime,
+      userPressTime,
+      reactionTime,
+      score,
+      sessionId
     });
 
     res.json({
       success: true,
-      message: 'Response recorded successfully',
-      responseId: `${operatorId}_${clipId}_${Date.now()}`
+      message: 'Response recorded successfully in Exam_Results sheet',
+      responseId: `${operatorId}_${clipId}_${Date.now()}`,
+      examResultsRecord: result
     });
 
   } catch (error) {
@@ -222,6 +237,61 @@ router.post('/accept-rules', async (req, res) => {
       success: false,
       message: 'Failed to accept rules and setup Exam_Results',
       error: error.message
+    });
+  }
+});
+
+// Update exam status (Submitted/Attempted)
+router.post('/update-exam-status', async (req, res) => {
+  try {
+    const { 
+      operatorId, 
+      sessionId, 
+      status, 
+      endTime, 
+      totalScore 
+    } = req.body;
+
+    // Validate required fields
+    if (!operatorId || !status) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required fields: operatorId and status'
+      });
+    }
+
+    console.log('📝 Updating exam status:', {
+      operatorId,
+      sessionId,
+      status,
+      endTime,
+      totalScore,
+      timestamp: new Date().toISOString()
+    });
+
+    // Update exam status in Exam_Results Google Sheet
+    const result = await sheetsService.updateExamStatus({
+      operatorId,
+      sessionId,
+      status,
+      endTime,
+      totalScore
+    });
+
+    res.json({
+      success: true,
+      message: `Exam status updated to: ${status}`,
+      operatorId,
+      status,
+      examStatusUpdate: result
+    });
+
+  } catch (error) {
+    console.error('❌ Error updating exam status:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to update exam status',
+      message: error.message
     });
   }
 });

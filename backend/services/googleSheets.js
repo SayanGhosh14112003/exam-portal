@@ -380,10 +380,6 @@ class GoogleSheetsService {
 
       console.log(`📋 Found ${clipIds.length} Clip_IDs in QuestionBank:`, clipIds);
 
-      // Now check Exam_Results sheet (Sheet1) and see which columns exist
-      // We'll assume Exam_Results is in the same spreadsheet but we need to check the structure
-      // For now, let's create a simple structure with Clip_ID columns
-
       // Get current Exam_Results sheet structure (from the separate Exam_Results spreadsheet)
       let examResultsResponse;
       let existingColumns = [];
@@ -397,16 +393,22 @@ class GoogleSheetsService {
         console.log('📋 Existing columns in Exam_Results:', existingColumns);
       } catch (error) {
         console.log('📋 Exam_Results sheet not accessible:', error.message);
-        // If we can't access the Exam_Results sheet, we'll try to create the structure
-        // But since it's a separate spreadsheet, we'll assume it exists and just log the error
         console.log('⚠️ Exam_Results spreadsheet exists but may need proper permissions');
         existingColumns = [];
       }
 
-      // Determine which Clip_ID columns need to be created
-      const columnsToCreate = clipIds.filter(clipId => !existingColumns.includes(clipId));
-      const existingColumnsCount = clipIds.filter(clipId => existingColumns.includes(clipId)).length;
+      // Create column pairs for each Clip_ID: [Clip_ID, Clip_ID_Reaction_time]
+      const requiredColumns = [];
+      clipIds.forEach(clipId => {
+        requiredColumns.push(clipId); // Clip_ID column
+        requiredColumns.push(`${clipId}_Reaction_time`); // Clip_ID_Reaction_time column
+      });
 
+      // Determine which columns need to be created
+      const columnsToCreate = requiredColumns.filter(column => !existingColumns.includes(column));
+      const existingColumnsCount = requiredColumns.filter(column => existingColumns.includes(column)).length;
+
+      console.log(`📊 Required columns: ${requiredColumns.length} (${clipIds.length} Clip_ID pairs)`);
       console.log(`📊 Columns to create: ${columnsToCreate.length}`);
       console.log(`📊 Existing columns: ${existingColumnsCount}`);
 
@@ -414,12 +416,12 @@ class GoogleSheetsService {
 
       // Create missing columns by adding them to the header row
       if (columnsToCreate.length > 0) {
-        // Prepare the header row with existing columns + new Clip_ID columns
+        // Prepare the header row with existing columns + new columns
         const newHeaderRow = [...existingColumns, ...columnsToCreate];
         
-        // If no existing columns, add basic headers first
+        // If no existing columns, add basic headers first (matching existing structure)
         if (existingColumns.length === 0) {
-          newHeaderRow.unshift('Exam_ID', 'Operator_ID', 'Session_ID', 'Start_Time', 'End_Time', 'Total_Score');
+          newHeaderRow.unshift('User_ID', 'Start_Time', 'End_Time', 'Total_Score', 'Status');
         }
 
         // Update the header row in the Exam_Results spreadsheet
@@ -433,7 +435,18 @@ class GoogleSheetsService {
         });
 
         createdColumns = columnsToCreate.length;
-        console.log(`✅ Created ${createdColumns} new Clip_ID columns in Exam_Results`);
+        console.log(`✅ Created ${createdColumns} new columns in Exam_Results`);
+        
+        // Log the created column pairs
+        const createdPairs = [];
+        for (let i = 0; i < columnsToCreate.length; i += 2) {
+          const clipId = columnsToCreate[i];
+          const reactionTimeColumn = columnsToCreate[i + 1];
+          if (reactionTimeColumn && reactionTimeColumn.includes('_Reaction_time')) {
+            createdPairs.push(`${clipId} + ${reactionTimeColumn}`);
+          }
+        }
+        console.log(`📋 Created column pairs:`, createdPairs);
       }
 
       const result = {
@@ -441,7 +454,12 @@ class GoogleSheetsService {
         created: createdColumns,
         existing: existingColumnsCount,
         clipIds: clipIds,
-        newColumns: columnsToCreate
+        newColumns: columnsToCreate,
+        columnPairs: clipIds.map(clipId => ({
+          clipId: clipId,
+          clipIdColumn: clipId,
+          reactionTimeColumn: `${clipId}_Reaction_time`
+        }))
       };
 
       console.log('🎯 Exam_Results sheet setup complete:', result);
@@ -449,6 +467,243 @@ class GoogleSheetsService {
 
     } catch (error) {
       console.error('❌ Error setting up Exam_Results sheet:', error);
+      throw error;
+    }
+  }
+
+  async recordExamResponse(responseData) {
+    try {
+      if (!this.sheets || !this.examResultsSpreadsheetId) {
+        throw new Error('Google Sheets service not properly initialized');
+      }
+
+      const { 
+        operatorId, 
+        clipId, 
+        hasIntervention, 
+        correctTime, 
+        userPressTime, 
+        reactionTime, 
+        score,
+        sessionId
+      } = responseData;
+
+      console.log('📝 Recording exam response:', { operatorId, clipId, score, reactionTime, sessionId });
+
+      // Get current Exam_Results sheet structure to find column indices
+      const headerResponse = await this.sheets.spreadsheets.values.get({
+        spreadsheetId: this.examResultsSpreadsheetId,
+        range: 'Sheet1!1:1',
+      });
+
+      const headers = headerResponse.data.values?.[0] || [];
+      console.log('📋 Exam_Results headers:', headers);
+
+      // Find column indices for this Clip_ID
+      const clipIdColumnIndex = headers.indexOf(clipId);
+      const reactionTimeColumnIndex = headers.indexOf(`${clipId}_Reaction_time`);
+
+      console.log(`🔍 Looking for columns: ${clipId} (index: ${clipIdColumnIndex}), ${clipId}_Reaction_time (index: ${reactionTimeColumnIndex})`);
+
+      if (clipIdColumnIndex === -1 || reactionTimeColumnIndex === -1) {
+        console.error(`❌ Columns not found for Clip_ID: ${clipId}`);
+        console.error(`Available columns:`, headers);
+        throw new Error(`Columns not found for Clip_ID: ${clipId}. Available columns: ${headers.join(', ')}`);
+      }
+
+      // Find or create a row for this operator's exam session
+      const dataResponse = await this.sheets.spreadsheets.values.get({
+        spreadsheetId: this.examResultsSpreadsheetId,
+        range: 'Sheet1!A:Z', // Get all data to find existing row
+      });
+
+      const rows = dataResponse.data.values || [];
+      let targetRowIndex = -1;
+
+      // Look for existing row with matching User_ID (which is the operatorId)
+      console.log(`🔍 Looking for existing row with User_ID: ${operatorId}`);
+      for (let i = 1; i < rows.length; i++) { // Skip header row
+        const row = rows[i];
+        const rowUserId = row[0]; // User_ID column (index 0)
+        console.log(`   Row ${i}: User_ID = "${rowUserId}"`);
+        
+        if (rowUserId === operatorId) {
+          targetRowIndex = i + 1; // 1-based row index
+          console.log(`✅ Found existing row at index ${targetRowIndex}`);
+          break;
+        }
+      }
+
+      // If no existing row found, create a new one
+      if (targetRowIndex === -1) {
+        console.log(`📝 Creating new row for User_ID: ${operatorId}`);
+        const newRow = [
+          operatorId, // User_ID (index 0)
+          new Date().toISOString(), // Start_Time (index 1)
+          '', // End_Time (index 2) - will be updated when exam completes
+          0, // Total_Score (index 3) - will be calculated
+          'In Progress' // Status (index 4)
+        ];
+
+        // Add empty values for all Clip_ID columns (starting from index 5)
+        for (let i = 5; i < headers.length; i++) {
+          newRow.push('');
+        }
+
+        console.log(`📝 New row data:`, newRow);
+
+        // Append the new row
+        await this.sheets.spreadsheets.values.append({
+          spreadsheetId: this.examResultsSpreadsheetId,
+          range: 'Sheet1!A:Z',
+          valueInputOption: 'RAW',
+          resource: {
+            values: [newRow]
+          }
+        });
+
+        // Get the new row index
+        const updatedDataResponse = await this.sheets.spreadsheets.values.get({
+          spreadsheetId: this.examResultsSpreadsheetId,
+          range: 'Sheet1!A:Z',
+        });
+        targetRowIndex = updatedDataResponse.data.values.length;
+        console.log(`✅ Created new row at index ${targetRowIndex}`);
+      }
+
+      // Update the specific cells for this Clip_ID
+      const clipIdColumn = String.fromCharCode(65 + clipIdColumnIndex);
+      const reactionTimeColumn = String.fromCharCode(65 + reactionTimeColumnIndex);
+      
+      const updates = [
+        {
+          range: `Sheet1!${clipIdColumn}${targetRowIndex}`,
+          values: [[score]] // Clip_ID column gets the score (0 or 1)
+        },
+        {
+          range: `Sheet1!${reactionTimeColumn}${targetRowIndex}`,
+          values: [[reactionTime !== null ? reactionTime.toFixed(3) : '']] // Reaction_time column
+        }
+      ];
+
+      console.log(`📝 Updating cells: ${clipIdColumn}${targetRowIndex}=${score}, ${reactionTimeColumn}${targetRowIndex}=${reactionTime !== null ? reactionTime.toFixed(3) : 'null'}`);
+
+      await this.sheets.spreadsheets.values.batchUpdate({
+        spreadsheetId: this.examResultsSpreadsheetId,
+        resource: {
+          valueInputOption: 'RAW',
+          data: updates
+        }
+      });
+
+      console.log(`✅ Recorded response for ${clipId}: Score=${score}, ReactionTime=${reactionTime}`);
+
+      return {
+        success: true,
+        rowIndex: targetRowIndex,
+        clipIdColumn: clipId,
+        reactionTimeColumn: `${clipId}_Reaction_time`,
+        score: score,
+        reactionTime: reactionTime
+      };
+
+    } catch (error) {
+      console.error('❌ Error recording exam response:', error);
+      throw error;
+    }
+  }
+
+  async updateExamStatus(statusData) {
+    try {
+      if (!this.sheets || !this.examResultsSpreadsheetId) {
+        throw new Error('Google Sheets service not properly initialized');
+      }
+
+      const { operatorId, sessionId, status, endTime, totalScore } = statusData;
+
+      console.log('📝 Updating exam status:', { operatorId, sessionId, status, endTime, totalScore });
+
+      // Get current Exam_Results sheet data
+      const dataResponse = await this.sheets.spreadsheets.values.get({
+        spreadsheetId: this.examResultsSpreadsheetId,
+        range: 'Sheet1!A:Z',
+      });
+
+      const rows = dataResponse.data.values || [];
+      let targetRowIndex = -1;
+
+      // Look for existing row with matching User_ID (which is the operatorId)
+      for (let i = 1; i < rows.length; i++) { // Skip header row
+        const row = rows[i];
+        const rowUserId = row[0]; // User_ID column (index 0)
+        
+        if (rowUserId === operatorId) {
+          targetRowIndex = i + 1; // 1-based row index
+          break;
+        }
+      }
+
+      if (targetRowIndex === -1) {
+        throw new Error(`No exam record found for User_ID: ${operatorId}`);
+      }
+
+      // Get headers to find column indices
+      const headerResponse = await this.sheets.spreadsheets.values.get({
+        spreadsheetId: this.examResultsSpreadsheetId,
+        range: 'Sheet1!1:1',
+      });
+
+      const headers = headerResponse.data.values?.[0] || [];
+      const endTimeColumnIndex = headers.indexOf('End_Time');
+      const totalScoreColumnIndex = headers.indexOf('Total_Score');
+      const statusColumnIndex = headers.indexOf('Status');
+
+      // Prepare updates
+      const updates = [];
+
+      if (endTimeColumnIndex !== -1) {
+        updates.push({
+          range: `Sheet1!${String.fromCharCode(65 + endTimeColumnIndex)}${targetRowIndex}`,
+          values: [[endTime]]
+        });
+      }
+
+      if (totalScoreColumnIndex !== -1 && totalScore !== undefined) {
+        updates.push({
+          range: `Sheet1!${String.fromCharCode(65 + totalScoreColumnIndex)}${targetRowIndex}`,
+          values: [[totalScore]]
+        });
+      }
+
+      if (statusColumnIndex !== -1) {
+        updates.push({
+          range: `Sheet1!${String.fromCharCode(65 + statusColumnIndex)}${targetRowIndex}`,
+          values: [[status]]
+        });
+      }
+
+      if (updates.length > 0) {
+        await this.sheets.spreadsheets.values.batchUpdate({
+          spreadsheetId: this.examResultsSpreadsheetId,
+          resource: {
+            valueInputOption: 'RAW',
+            data: updates
+          }
+        });
+
+        console.log(`✅ Updated exam status for ${operatorId}: ${status}`);
+      }
+
+      return {
+        success: true,
+        rowIndex: targetRowIndex,
+        status: status,
+        endTime: endTime,
+        totalScore: totalScore
+      };
+
+    } catch (error) {
+      console.error('❌ Error updating exam status:', error);
       throw error;
     }
   }

@@ -1,5 +1,3 @@
-// import React, { useState, useEffect, useRef } from 'react';
-
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 
 
@@ -53,12 +51,6 @@ const handleVideoComplete = useCallback(() => {
   setResponses(prev => [...prev, response]);
   submitResponse(response);
 
-  // setShowResponse({ type: 'result', ...result });
-  // setTimeout(() => {
-  //   setShowResponse(null);
-  //   if (hasUserResponded.current) {
-  //     moveToNextVideo();
-  //   }
     setTimeout(() => {
     if (hasUserResponded.current) {
       moveToNextVideo();
@@ -72,18 +64,36 @@ const handleVideoComplete = useCallback(() => {
     responses]);
 
 
-
-
-
-
-
-
-
   // Fetch videos on component mount
   useEffect(() => {
     fetchVideos();
 
-    // Cleanup intervals on unmount
+    // Handle early exit detection
+    const handleBeforeUnload = async (event) => {
+      // Only mark as attempted if exam is in progress (not completed)
+      if (responses.length > 0 && responses.length < videos.length) {
+        try {
+          // Use sendBeacon for reliable delivery even when page is closing
+          const data = JSON.stringify({
+            operatorId,
+            sessionId,
+            status: 'Attempted',
+            endTime: new Date().toISOString(),
+            totalScore: responses.reduce((sum, r) => sum + r.score, 0)
+          });
+          
+          navigator.sendBeacon('/api/update-exam-status', data);
+          console.log('⚠️ Exam marked as Attempted (early exit detected)');
+        } catch (error) {
+          console.error('Failed to mark exam as attempted:', error);
+        }
+      }
+    };
+
+    // Add event listener for page unload
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    // Cleanup intervals and event listener on unmount
     return () => {
       if (window.videoInterval) {
         clearInterval(window.videoInterval);
@@ -91,8 +101,9 @@ const handleVideoComplete = useCallback(() => {
       if (window.demoInterval) {
         clearInterval(window.demoInterval);
       }
+      window.removeEventListener('beforeunload', handleBeforeUnload);
     };
-  }, []);
+  }, [responses, videos.length, operatorId, sessionId]);
 
 
 
@@ -106,10 +117,6 @@ useEffect(() => {
     startVideo();
   }
 }, [currentVideoIndex]);
-
-
-
-  
 
 
 // Set up spacebar listener with multiple capture points
@@ -148,78 +155,6 @@ useEffect(() => {
       window.removeEventListener('keyup', handleKeyUp, true);
     };
   }, [isPlaying, videoStartTime]); // Dependencies updated
-
-  // Video time update listener
-  // useEffect(() => {
-  //   const video = videoRef.current;
-  //   if (!video) return;
-
-  //   const handleTimeUpdate = () => {
-  //     setCurrentTime(video.currentTime);
-  //   };
-
-  //   const handleVideoEnd = () => {
-  //     handleVideoComplete();
-  //   };
-
-  //   const handleLoadedMetadata = () => {
-  //     setVideoDuration(video.duration || 120); // Fallback to 120 seconds if duration not available
-  //   };
-
-  //   video.addEventListener('timeupdate', handleTimeUpdate);
-  //   video.addEventListener('ended', handleVideoEnd);
-  //   video.addEventListener('loadedmetadata', handleLoadedMetadata);
-
-  //   return () => {
-  //     video.removeEventListener('timeupdate', handleTimeUpdate);
-  //     video.removeEventListener('ended', handleVideoEnd);
-  //     video.removeEventListener('loadedmetadata', handleLoadedMetadata);
-  //   };
-  // }, [currentVideoIndex]);
-
-
-
-
-// new updated version 1:
-
-// useEffect(() => {
-//   const video = videoRef.current;
-//   if (!video) return;
-
-//   const handleTimeUpdate = () => {
-//     setCurrentTime(video.currentTime);
-//   };
-
-//   const handleVideoEnd = () => {
-//     handleVideoComplete();
-//   };
-
-//   const handleLoadedMetadata = () => {
-//     const duration = video.duration || 120;
-//     setVideoDuration(duration);
-//     console.log('📏 Metadata loaded, duration =', duration);
-
-//     // ✅ Try autoplay
-//     video.play().then(() => {
-//       console.log('▶️ Auto-play started');
-//       setIsPlaying(true);
-//       setVideoStartTime(Date.now());
-//     }).catch(err => {
-//       console.warn('🔇 Auto-play failed:', err);
-//     });
-//   };
-
-//   video.addEventListener('timeupdate', handleTimeUpdate);
-//   video.addEventListener('ended', handleVideoEnd);
-//   video.addEventListener('loadedmetadata', handleLoadedMetadata);
-
-//   return () => {
-//     video.removeEventListener('timeupdate', handleTimeUpdate);
-//     video.removeEventListener('ended', handleVideoEnd);
-//     video.removeEventListener('loadedmetadata', handleLoadedMetadata);
-//   };
-// }, [currentVideoIndex, handleVideoComplete]);
-
 
 
 // new updated version 2:
@@ -265,12 +200,6 @@ useEffect(() => {
   };
 }, [currentVideoIndex, handleVideoComplete]);
 
-
-
-
-
-
-
   // new added
 
   // Actively update currentTime via requestAnimationFrame
@@ -295,14 +224,7 @@ useEffect(() => {
     };
   }, [isPlaying]);
 
-
-
-
-
-
-
-
-
+  // Fetch videos from backend
   const fetchVideos = useCallback(async () => {
     try {
       setIsLoading(true);
@@ -347,9 +269,6 @@ useEffect(() => {
 
   //new modified version
   const startVideo = async () => {
-
-
-
 
     const currentVideo = getCurrentVideo();
 
@@ -408,13 +327,6 @@ useEffect(() => {
             console.error('❌ Error starting video:', err);
           }
 
-
-
-
-
-
-
-
           console.log(`▶️ Started video: ${currentVideo?.videoTitle}`);
         }
       }
@@ -447,48 +359,7 @@ useEffect(() => {
     }
   };
 
-
-  // const handleVideoComplete = () => {
-  //   setIsPlaying(false);
-  //   const currentVideo = getCurrentVideo();
-  //   if (!currentVideo) return;
-
-  //   // Calculate score based on response
-  //   const result = calculateScore(currentVideo);
-
-  //   // Store response
-  //   const response = {
-  //     clipId: currentVideo.clipId,
-  //     videoTitle: currentVideo.videoTitle,
-  //     hasIntervention: currentVideo.hasIntervention,
-  //     correctTime: currentVideo.correctTime,
-  //     userPressTime: spacebarPressTime.current,
-  //     reactionTime: result.reactionTime,
-  //     score: result.score,
-  //     feedback: result.feedback,
-  //     timestamp: new Date().toISOString()
-  //   };
-
-  //   setResponses(prev => [...prev, response]);
-  //   console.log('📊 Video response recorded:', response);
-
-  //   // Submit to backend
-  //   submitResponse(response);
-
-  //   // Show result briefly
-  //   setShowResponse({ type: 'result', ...result });
-  //   setTimeout(() => {
-  //     setShowResponse(null);
-  //     // Auto-advance only if spacebar was pressed
-  //     if (hasUserResponded.current) {
-  //       moveToNextVideo();
-  //     } else {
-  //       // If no spacebar press, show Next button for manual progression
-  //       setShowNextButton(true);
-  //     }
-  //   }, 2000);
-  // };
-
+  // Calculate score based on user response and video intervention
   const calculateScore = (video) => {
     const { hasIntervention, correctTime } = video;
     const userPressed = hasUserResponded.current;
@@ -570,7 +441,7 @@ useEffect(() => {
     }
   };
 
-  const handleExamComplete = () => {
+  const handleExamComplete = async () => {
     const totalScore = responses.reduce((sum, r) => sum + r.score, 0);
     const percentage = ((totalScore / responses.length) * 100).toFixed(1);
 
@@ -579,6 +450,20 @@ useEffect(() => {
       correctResponses: totalScore,
       percentage: `${percentage}%`
     });
+
+    // Mark exam as "Submitted" when all clips are completed
+    try {
+      await axios.post('/api/update-exam-status', {
+        operatorId,
+        sessionId,
+        status: 'Submitted',
+        endTime: new Date().toISOString(),
+        totalScore: totalScore
+      });
+      console.log('✅ Exam marked as Submitted');
+    } catch (error) {
+      console.error('Failed to mark exam as submitted:', error);
+    }
 
     onExamComplete({
       responses,
@@ -808,35 +693,7 @@ useEffect(() => {
                 ) : (
                   // Regular video file (Firebase/other direct URLs)
                   <div className="relative w-full h-full bg-black">
-                    {/* <video
-                      ref={videoRef}
-                      className="w-full h-full"
-                      controls={false}
-                      preload="metadata"
-                    >
-                      <source src={currentVideo.driveLink} type="video/mp4" />
-                      Your browser does not support the video tag.
-                    </video> */
-
-
-                      // new changed version 1
-                      // <video
-                      //   ref={videoRef}
-                      //   className="w-full h-full"
-                      //   controls={false}
-                      //   preload="metadata"
-                      //   onLoadedMetadata={(e) => {
-                      //     const duration = e.target.duration;
-                      //     console.log('📏 Metadata loaded, duration =', duration);
-                      //     setVideoDuration(duration || 120); // fallback
-                      //   }}
-                      // >
-                      //   <source src={currentVideo.driveLink} type="video/mp4" />
-                      //   Your browser does not support the video tag.
-                      // </video>
-
-
-
+                    {
                       // new changed version 2
                       <video
                         key={currentVideo.clipId}
@@ -853,12 +710,6 @@ useEffect(() => {
                         <source src={currentVideo.driveLink} type="video/mp4" />
                         Your browser does not support the video tag.
                       </video>
-
-
-
-
-
-
 
 
                     }

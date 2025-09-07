@@ -1,483 +1,369 @@
-# Online Exam Portal
+# Exam Portal System
 
-A comprehensive online examination system built with React, Node.js, and Google Sheets integration for video-based assessments with real-time response tracking.
+A comprehensive video-based examination system that tracks user responses and reaction times for intervention assessment. The system integrates with Google Sheets for data storage and provides real-time exam monitoring with automatic status tracking.
 
-## 🏗️ Project Architecture
+## 🎯 Overview
 
-### 📁 Directory Structure
+The Exam Portal is designed for assessment scenarios where users watch video clips and respond to interventions. The system tracks:
+- **Response Accuracy**: Correct/incorrect responses (1 or 0)
+- **Reaction Time**: Time difference between correct intervention and user response
+- **Exam Status**: Complete tracking of exam progress and completion
+- **Early Exit Detection**: Automatic detection of abandoned sessions
 
-```
-Exam Portal/
-├── 📁 frontend/                    # React frontend application
-│   ├── 📁 public/                  # Static assets
-│   │   └── 📄 index.html          # Main HTML template
-│   ├── 📁 src/                     # Source code
-│   │   ├── 📁 components/          # React components
-│   │   │   ├── 📄 App.js          # Main application component & routing
-│   │   │   ├── 📄 OperatorIDModal.js    # ID verification modal
-│   │   │   ├── 📄 RulesSection.js       # Rules display component
-│   │   │   ├── 📄 ExamPortal.js         # Exam container component
-│   │   │   ├── 📄 VideoPlayer.js        # Video playback & assessment logic
-│   │   │   └── 📄 ExamResults.js        # Results display component
-│   │   ├── 📄 index.js            # React app entry point
-│   │   └── 📄 index.css           # Global styles & Tailwind imports
-│   ├── 📄 package.json            # Frontend dependencies & scripts
-│   ├── 📄 tailwind.config.js      # Tailwind CSS configuration
-│   └── 📄 postcss.config.js       # PostCSS configuration
-├── 📁 backend/                     # Node.js backend application
-│   ├── 📁 routes/                  # API route definitions
-│   │   └── 📄 api.js              # Main API routes (/api/videos, /api/responses)
-│   ├── 📁 services/                # Business logic services
-│   │   └── 📄 googleSheets.js     # Google Sheets API integration
-│   ├── 📄 server.js               # Express server setup & configuration
-│   ├── 📄 package.json            # Backend dependencies & scripts
-│   ├── 📄 .env                    # Environment variables (credentials)
-│   └── 📄 env.example             # Environment variables template
-├── 📄 package.json                # Root package.json (orchestrates both apps)
-├── 📄 .gitignore                  # Git ignore rules (protects credentials)
-└── 📄 README.md                   # This documentation file
-```
+## 🏗️ Architecture
 
-## 🎯 File-by-File Architecture Guide
+### Frontend (React)
+- **VideoPlayer Component**: Main exam interface with video playback
+- **RulesSection Component**: Rules acceptance and exam initialization
+- **ExamResults Component**: Results display and analysis
+- **Real-time Response Tracking**: Spacebar detection and timing
 
-### 🎨 Frontend Components
+### Backend (Node.js/Express)
+- **Google Sheets Integration**: Automatic data storage and retrieval
+- **API Endpoints**: RESTful API for exam management
+- **Status Management**: Dynamic exam status tracking
+- **Error Handling**: Comprehensive error management and logging
 
-#### **`frontend/src/components/App.js`**
-- **Purpose**: Main application component & state management
-- **Key Features**:
-  - Manages overall application flow (welcome → ID → rules → exam → results)
-  - Handles `currentStep` state transitions
-  - Integrates all major components
-- **When to Edit**: 
-  - To change overall app flow
-  - To add new steps in the process
-  - To modify state management logic
+### Data Storage (Google Sheets)
+- **QuestionBank Sheet**: Video clips and correct answers
+- **Exam_Results Sheet**: User responses and exam outcomes
+- **Dynamic Column Creation**: Automatic column setup based on QuestionBank
 
-#### **`frontend/src/components/OperatorIDModal.js`**
-- **Purpose**: Two-step operator ID verification system
-- **Key Features**:
-  - First ID entry with validation
-  - Second ID confirmation
-  - Error handling for mismatched IDs
-  - Auto-close on successful verification
-- **When to Edit**:
-  - To change ID validation rules
-  - To modify verification process
-  - To update error messages or UI
+## 📊 System Features
 
-#### **`frontend/src/components/RulesSection.js`**
-- **Purpose**: Displays examination rules and agreement
-- **Key Features**:
-  - Lists all assessment rules
-  - Agreement checkbox requirement
-  - "Agree & Next" button
-- **When to Edit**:
-  - To update examination rules text
-  - To modify agreement requirements
-  - To change rules display format
+### 1. Dynamic Exam Management
+- **No Fixed Exam IDs**: System adapts to any number of exams
+- **Session-based Tracking**: Each exam session is uniquely tracked
+- **Real-time Updates**: Immediate recording of responses
 
-#### **`frontend/src/components/ExamPortal.js`**
-- **Purpose**: Container for video assessment and results
-- **Key Features**:
-  - Renders VideoPlayer or ExamResults based on state
-  - Manages exam completion flow
-- **When to Edit**:
-  - To change exam container layout
-  - To modify exam completion logic
-  - To add new exam-related features
+### 2. Comprehensive Status Tracking
+- **"In Progress"**: Default status when exam starts
+- **"Submitted"**: When all clips are completed successfully
+- **"Attempted"**: When user exits early or abandons session
 
-#### **`frontend/src/components/VideoPlayer.js`** ⭐ **CORE COMPONENT**
-- **Purpose**: Video playback, spacebar detection, and assessment logic
-- **Key Features**:
-  - Fetches videos from Google Sheets API
-  - Handles Firebase and Google Drive video playback
-  - Real-time spacebar detection and response tracking
-  - Dynamic video duration display
-  - Smart auto-progression and manual controls
-  - Score calculation and response recording
-- **When to Edit**:
-  - To modify video playback behavior
-  - To change spacebar detection logic
-  - To update scoring algorithms
-  - To modify timer and duration displays
-  - To change video progression logic
+### 3. Early Exit Detection
+- **Browser Close Detection**: Uses `beforeunload` event
+- **Reliable Delivery**: `sendBeacon` API for guaranteed data transmission
+- **Partial Score Preservation**: Maintains data integrity for incomplete exams
 
-#### **`frontend/src/components/ExamResults.js`**
-- **Purpose**: Displays final assessment results
-- **Key Features**:
-  - Shows total score and percentage
-  - Displays individual video responses
-  - Provides assessment summary
-- **When to Edit**:
-  - To change results display format
-  - To add new result metrics
-  - To modify result calculation display
+### 4. Flexible Question Bank Integration
+- **Automatic Column Creation**: Creates columns for each Clip_ID
+- **Reaction Time Tracking**: Separate columns for timing data
+- **Scalable Structure**: Supports any number of video clips
 
-### 🔧 Backend Services
+## 🚀 Quick Start
 
-#### **`backend/server.js`**
-- **Purpose**: Express server setup and configuration
-- **Key Features**:
-  - Server initialization and port configuration
-  - CORS setup for frontend communication
-  - Route mounting and middleware setup
-- **When to Edit**:
-  - To change server configuration
-  - To add new middleware
-  - To modify port settings
-
-#### **`backend/routes/api.js`**
-- **Purpose**: API endpoint definitions
-- **Key Features**:
-  - `GET /api/videos` - Fetches active videos from Google Sheets
-  - `POST /api/responses` - Records user responses
-  - `POST /api/process-video-links` - Processes video links (optional)
-- **When to Edit**:
-  - To add new API endpoints
-  - To modify existing endpoint logic
-  - To change request/response formats
-
-#### **`backend/services/googleSheets.js`** ⭐ **CORE SERVICE**
-- **Purpose**: Google Sheets API integration and data management
-- **Key Features**:
-  - Connects to Google Sheets using service account
-  - Fetches active videos from QuestionBank worksheet
-  - Handles video URL processing (Firebase vs Google Drive)
-  - Parses video metadata (duration, intervention timing)
-  - Manages video link conversion and updates
-- **When to Edit**:
-  - To change Google Sheets connection logic
-  - To modify video data parsing
-  - To update video URL handling
-  - To change worksheet structure or column mapping
-
-### ⚙️ Configuration Files
-
-#### **`backend/.env`**
-- **Purpose**: Environment variables for sensitive data
-- **Contains**:
-  - Google Sheets API credentials
-  - Service account configuration
-  - Database connection settings
-- **When to Edit**:
-  - To update API credentials
-  - To change database settings
-  - To modify environment-specific configurations
-
-#### **`frontend/package.json`**
-- **Purpose**: Frontend dependencies and scripts
-- **Key Scripts**:
-  - `start` - Runs React development server
-  - `build` - Creates production build
-- **When to Edit**:
-  - To add new frontend dependencies
-  - To modify build scripts
-  - To update React or other library versions
-
-#### **`backend/package.json`**
-- **Purpose**: Backend dependencies and scripts
-- **Key Scripts**:
-  - `start` - Runs production server
-  - `dev` - Runs development server with nodemon
-- **When to Edit**:
-  - To add new backend dependencies
-  - To modify server scripts
-  - To update Node.js library versions
-
-## 🚀 Quick File Location Guide
-
-### 🎯 Common Edit Scenarios
-
-| **What You Want to Change** | **File to Edit** |
-|------------------------------|------------------|
-| **Video playback behavior** | `frontend/src/components/VideoPlayer.js` |
-| **Spacebar detection logic** | `frontend/src/components/VideoPlayer.js` |
-| **Scoring algorithm** | `frontend/src/components/VideoPlayer.js` |
-| **Video duration display** | `frontend/src/components/VideoPlayer.js` |
-| **Auto-progression logic** | `frontend/src/components/VideoPlayer.js` |
-| **Google Sheets data fetching** | `backend/services/googleSheets.js` |
-| **Video URL processing** | `backend/services/googleSheets.js` |
-| **API endpoints** | `backend/routes/api.js` |
-| **Overall app flow** | `frontend/src/components/App.js` |
-| **ID verification process** | `frontend/src/components/OperatorIDModal.js` |
-| **Examination rules** | `frontend/src/components/RulesSection.js` |
-| **Results display** | `frontend/src/components/ExamResults.js` |
-| **Server configuration** | `backend/server.js` |
-| **Environment variables** | `backend/.env` |
-| **Dependencies** | `frontend/package.json` or `backend/package.json` |
-| **Styling** | `frontend/src/index.css` or component files |
-| **Build configuration** | `frontend/tailwind.config.js` |
-
-### 🔍 Key Code Sections
-
-#### **Video Assessment Logic** (`VideoPlayer.js`)
-```javascript
-// Lines 122-141: Spacebar press handling
-const handleSpacebarPress = () => { ... }
-
-// Lines 210-258: Video completion logic
-const handleVideoComplete = () => { ... }
-
-// Lines 143-207: Video start logic
-const startVideo = () => { ... }
-```
-
-#### **Google Sheets Integration** (`googleSheets.js`)
-```javascript
-// Lines 45-85: Fetch active videos
-async getActiveVideos() { ... }
-
-// Lines 87-120: Process video links
-async processVideoLinks() { ... }
-```
-
-#### **API Routes** (`api.js`)
-```javascript
-// Lines 15-35: GET /api/videos endpoint
-router.get('/videos', async (req, res) => { ... }
-
-// Lines 37-55: POST /api/responses endpoint
-router.post('/responses', async (req, res) => { ... }
-```
-
-## 🛠️ Tech Stack
-
-### Frontend
-- **React** - Component-based UI framework
-- **Tailwind CSS** - Utility-first CSS framework
-- **Axios** - HTTP client for API requests
-
-### Backend
-- **Node.js** - JavaScript runtime
-- **Express.js** - Web framework
-- **Google Sheets API** - Data management
-- **CORS** - Cross-origin resource sharing
-
-### Database
-- **Google Sheets** - Cloud-based data storage with real-time updates
-
-## 📋 Prerequisites
-
+### Prerequisites
 - Node.js (v14 or higher)
-- npm or yarn
-- Google Cloud Platform account
-- Google Sheets API credentials
-- Two Google Spreadsheets:
-  - **QuestionBank Spreadsheet**: Contains video data (Clip_ID, Video_Title, etc.)
-  - **Exam_Results Spreadsheet**: Stores exam results and responses
+- Google Cloud Service Account with Sheets API access
+- Google Sheets with QuestionBank data
 
-## ⚙️ Installation
+### Installation
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/yourusername/exam-portal.git
+   git clone <repository-url>
    cd exam-portal
    ```
 
-2. **Install dependencies for all modules**
+2. **Install dependencies**
    ```bash
-   npm run install-all
+   # Install root dependencies
+   npm install
+   
+   # Install backend dependencies
+   cd backend
+   npm install
+   
+   # Install frontend dependencies
+   cd ../frontend
+   npm install
    ```
 
-3. **Set up Google Sheets API**
-   - Create a Google Cloud Platform project
-   - Enable the Google Sheets API
-   - Create a service account and download the credentials JSON
-   - Copy `backend/.env.example` to `backend/.env`
-   - Fill in your Google credentials in the `.env` file
+3. **Environment Setup**
+   ```bash
+   # Copy environment template
+   cp backend/env.example backend/.env
+   
+   # Configure your environment variables
+   # See Environment Variables section below
+   ```
 
-4. **Configure your Google Sheet**
-   - Create a spreadsheet with columns: `Clip_ID`, `Video_Title`, `Has_Intervention`, `Correct_Time`, `Is_Active`, `Drive_Link`, `Fire_Base_Link`
-   - Update the spreadsheet ID in the backend service
-   - Ensure your service account has read access to the sheet
+4. **Start the application**
+   ```bash
+   # Start backend server (Terminal 1)
+   cd backend
+   npm start
+   
+   # Start frontend server (Terminal 2)
+   cd frontend
+   npm start
+   ```
 
-## 🚀 Running the Application
+5. **Access the application**
+   - Frontend: http://localhost:3000
+   - Backend API: http://localhost:5001
 
-### Development Mode
-```bash
-npm run dev
+## 🔧 Environment Variables
+
+Create a `.env` file in the `backend` directory with the following variables:
+
+```env
+# Google Sheets Configuration
+GOOGLE_SHEETS_SPREADSHEET_ID=your_questionbank_spreadsheet_id
+EXAM_RESULTS_SPREADSHEET_ID=your_exam_results_spreadsheet_id
+
+# Google Service Account Credentials
+GOOGLE_SERVICE_ACCOUNT_TYPE=service_account
+GOOGLE_PROJECT_ID=your_project_id
+GOOGLE_PRIVATE_KEY_ID=your_private_key_id
+GOOGLE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
+GOOGLE_CLIENT_EMAIL=your_service_account_email
+GOOGLE_CLIENT_ID=your_client_id
+GOOGLE_AUTH_URI=https://accounts.google.com/o/oauth2/auth
+GOOGLE_TOKEN_URI=https://oauth2.googleapis.com/token
+GOOGLE_AUTH_PROVIDER_CERT_URL=https://www.googleapis.com/oauth2/v1/certs
+GOOGLE_CLIENT_CERT_URL=your_client_cert_url
+GOOGLE_UNIVERSE_DOMAIN=googleapis.com
+
+# Server Configuration
+PORT=5001
+NODE_ENV=development
 ```
-This starts both frontend (port 3000) and backend (port 5001) concurrently.
 
-### Individual Services
-```bash
-# Backend only
-npm run server
+## 📋 Google Sheets Setup
 
-# Frontend only  
-npm run client
+### QuestionBank Sheet Structure
+```
+Clip_ID | Video_Title | Has_Intervention | Correct_Time | Is_Active | Drive_Link | Fire_Base_Link
 ```
 
-## 📊 Google Sheets Configuration
+### Exam_Results Sheet Structure
+```
+User_ID | Start_Time | End_Time | Total_Score | Status | [Clip_IDs] | [Clip_ID_Reaction_times]
+```
 
-### QuestionBank Spreadsheet
-Your main Google Sheet should have the following structure:
+The system automatically creates columns for each Clip_ID in the QuestionBank:
+- `Clip_ID`: Stores score (1 or 0)
+- `Clip_ID_Reaction_time`: Stores reaction time in seconds
 
-| Clip_ID | Video_Title | Has_Intervention | Correct_Time | Is_Active | Drive_Link | Fire_Base_Link |
-|---------|-------------|------------------|--------------|-----------|------------|----------------|
-| Ok934   | testing 1   | TRUE            | 00:41        | YES       | https://drive.google.com/file/d/... | https://firebasestorage.googleapis.com/... |
-| Ok935   | testing 2   | FALSE           |              | YES       | https://drive.google.com/file/d/... | https://firebasestorage.googleapis.com/... |
+## 🔄 Workflow
 
-### Exam_Results Spreadsheet
-The system automatically creates an Exam_Results spreadsheet with the following structure:
+### 1. Rules Acceptance
+- User enters Operator ID
+- Reads and accepts examination rules
+- System triggers Exam_Results sheet setup
+- Creates/verifies required columns
 
-| Exam_ID | Operator_ID | Session_ID | Start_Time | End_Time | Total_Score | Ok934 | Ok935 | Ok936 |
-|---------|-------------|------------|------------|----------|-------------|-------|-------|-------|
-| exam_001| 1234        | session_123| 2025-09-07 | 2025-09-07| 85%         | 1     | 0     | 1     |
+### 2. Exam Execution
+- User watches video clips sequentially
+- Presses SPACEBAR when intervention is needed
+- System records response and reaction time
+- Real-time updates to Exam_Results sheet
 
-**Important**: 
-- The Exam_Results spreadsheet ID is: `16Z0UWUup7zk3Rw2rOXXCW16o8XzNyrDVXNtt0EP7r0s`
-- Make sure to share this spreadsheet with your service account email
-- The system automatically creates columns for each Clip_ID from the QuestionBank
+### 3. Exam Completion
+- **Normal Completion**: Status = "Submitted"
+- **Early Exit**: Status = "Attempted" (automatic detection)
+- Final score calculation and storage
 
-### Column Descriptions:
-- **Clip_ID**: Unique identifier for each video
-- **Video_Title**: Display name for the video
-- **Has_Intervention**: TRUE/FALSE - whether the video requires intervention
-- **Correct_Time**: Time in MM:SS format when intervention should occur
-- **Is_Active**: YES/NO - whether to include this video in assessments
-- **Drive_Link**: Google Drive sharing link for the video (fallback)
-- **Fire_Base_Link**: Firebase Storage URL for the video (primary)
+## 🛠️ API Endpoints
 
-## 🎯 Application Flow
+### Core Endpoints
 
-1. **Welcome Screen**: Initial landing page
-2. **Operator ID Verification**: 
-   - Enter operator ID
-   - Confirm ID (must match)
-   - Proceed to rules or show error
-3. **Rules Section**: 
-   - Display examination rules
-   - Require agreement to proceed
-4. **Video Assessment**:
-   - Load videos from Google Sheets
-   - Display video information
-   - Start timed assessment (dynamic duration per video)
-   - Detect spacebar presses for interventions
-   - Calculate scores based on timing accuracy
-   - Smart auto-progression or manual controls
-5. **Results**: Display final assessment results
-
-## 🔧 API Endpoints
-
-### GET /api/videos
-Returns active videos from Google Sheets
+#### `POST /api/accept-rules`
+Accepts rules and sets up Exam_Results sheet
 ```json
 {
-  "success": true,
-  "videos": [
-    {
-      "clipId": "Ok934",
-      "videoTitle": "testing 1",
-      "hasIntervention": true,
-      "correctTime": 41,
-      "isActive": true,
-      "driveLink": "https://firebasestorage.googleapis.com/...",
-      "fireBaseLink": "https://firebasestorage.googleapis.com/...",
-      "order": 1
-    }
-  ],
-  "totalCount": 2
+  "operatorId": "string"
 }
 ```
 
-### POST /api/responses
-Records user responses during assessments
+#### `POST /api/responses`
+Records individual exam responses
 ```json
 {
-  "operatorId": "OP123",
-  "sessionId": "session_1234567890",
-  "clipId": "Ok934",
-  "responseTime": 40.5,
-  "hasIntervention": true,
-  "isCorrect": true,
-  "score": 1
+  "operatorId": "string",
+  "clipId": "string",
+  "hasIntervention": boolean,
+  "correctTime": number,
+  "userPressTime": number,
+  "reactionTime": number,
+  "score": number,
+  "sessionId": "string"
 }
 ```
 
-## 🎮 Usage Instructions
+#### `POST /api/update-exam-status`
+Updates exam status (Submitted/Attempted)
+```json
+{
+  "operatorId": "string",
+  "sessionId": "string",
+  "status": "Submitted|Attempted",
+  "endTime": "ISO_timestamp",
+  "totalScore": number
+}
+```
 
-1. **Start the application** and navigate to `http://localhost:3000`
-2. **Enter your Operator ID** twice for verification
-3. **Read and agree** to the examination rules
-4. **For each video**:
-   - Click "Start Video Assessment" to begin
-   - Press **SPACEBAR** when you believe intervention is needed
-   - Watch the real-time timer and duration display
-   - System automatically moves to next video (or shows Next button)
-5. **Review your results** at the end of the assessment
+#### `GET /api/videos`
+Fetches active videos from QuestionBank
+
+#### `GET /api/test`
+Health check endpoint
+
+## 📊 Data Flow
+
+```
+User Accepts Rules
+       ↓
+Frontend: RulesSection.js
+       ↓
+API: POST /api/accept-rules
+       ↓
+Service: setupExamResultsSheet()
+       ↓
+Google Sheets: Exam_Results Sheet1
+       ↓
+Column Creation: Clip_ID + Clip_ID_Reaction_time pairs
+       ↓
+Ready for Exam Responses
+```
+
+## 🔍 Monitoring & Debugging
+
+### Console Logs
+- `📝 Recording exam response:` - Individual responses
+- `📝 Updating exam status:` - Status changes
+- `✅ Exam marked as Submitted` - Successful completion
+- `⚠️ Exam marked as Attempted` - Early exit detected
+
+### Error Handling
+- Comprehensive error logging
+- Graceful failure recovery
+- Detailed error messages for debugging
+
+## 🧪 Testing
+
+### Manual Testing
+1. Start both servers
+2. Open http://localhost:3000
+3. Enter an Operator ID
+4. Accept rules and complete exam
+5. Check Exam_Results sheet for data
+
+### API Testing
+```bash
+# Test rules acceptance
+curl -X POST http://localhost:5001/api/accept-rules \
+  -H "Content-Type: application/json" \
+  -d '{"operatorId": "TEST_USER"}'
+
+# Test response recording
+curl -X POST http://localhost:5001/api/responses \
+  -H "Content-Type: application/json" \
+  -d '{
+    "operatorId": "TEST_USER",
+    "clipId": "Ok934",
+    "hasIntervention": true,
+    "correctTime": 45.5,
+    "userPressTime": 45.2,
+    "reactionTime": -0.3,
+    "score": 1,
+    "sessionId": "SESSION_001"
+  }'
+```
+
+## 🚨 Troubleshooting
+
+### Common Issues
+
+1. **Google Sheets API Errors**
+   - Verify service account permissions
+   - Check spreadsheet IDs in environment variables
+   - Ensure sheets are accessible to service account
+
+2. **Column Not Found Errors**
+   - Run rules acceptance to create columns
+   - Verify QuestionBank has active clips
+   - Check Clip_ID naming consistency
+
+3. **Early Exit Detection Not Working**
+   - Verify `beforeunload` event listener
+   - Check `sendBeacon` API support
+   - Monitor console for error messages
+
+### Debug Mode
+Enable detailed logging by setting `NODE_ENV=development` in your environment variables.
+
+## 📈 Performance Considerations
+
+- **Batch Updates**: Multiple column updates in single API call
+- **Efficient Row Finding**: Optimized search algorithms
+- **Minimal API Calls**: Strategic caching and batching
+- **Error Recovery**: Retry logic for API failures
 
 ## 🔒 Security Features
 
-- **Environment Variables**: All sensitive credentials stored in `.env` files (not committed to Git)
-- **Service Account Authentication**: Secure Google Sheets API access using service accounts
-- **Input Validation**: Server-side validation and sanitization of all inputs
-- **CORS Configuration**: Controlled cross-origin access
-- **Credential Protection**: API keys and secrets excluded from version control
+- **Service Account Authentication**: Secure Google Sheets access
+- **Input Validation**: All API endpoints validate input data
+- **Error Logging**: Secure error handling without data exposure
+- **Rate Limiting**: Built-in protection against API abuse
 
-### Important Security Notes:
-- Never commit `.env` files to version control
-- Keep your service account JSON file secure and private
-- Regularly rotate API credentials
-- Use environment-specific configurations for production deployments
+## 📝 Development
 
-## 📱 Responsive Design
+### Project Structure
+```
+exam-portal/
+├── backend/
+│   ├── routes/
+│   │   └── api.js
+│   ├── services/
+│   │   └── googleSheets.js
+│   ├── server.js
+│   └── package.json
+├── frontend/
+│   ├── src/
+│   │   ├── components/
+│   │   │   ├── VideoPlayer.js
+│   │   │   ├── RulesSection.js
+│   │   │   └── ExamResults.js
+│   │   └── App.js
+│   └── package.json
+└── README.md
+```
 
-The application is fully responsive and works on:
-- Desktop computers
-- Tablets
-- Mobile devices (landscape recommended for video assessment)
-
-## 🐛 Troubleshooting
-
-### Common Issues:
-
-1. **Videos not loading**: Check Firebase/Google Drive sharing permissions
-2. **API connection errors**: Verify backend is running on port 5001
-3. **Google Sheets access denied**: Confirm service account has proper permissions
-4. **Spacebar not working**: Ensure the browser tab has focus during assessment
-5. **Timer not updating**: Check browser console for JavaScript errors
-
-### Debug Mode:
-Check browser console and backend logs for detailed error information.
-
-## 🤝 Contributing
-
+### Contributing
 1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+2. Create a feature branch
+3. Make your changes
+4. Test thoroughly
+5. Submit a pull request
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License - see the LICENSE file for details.
 
-## 👥 Support
+## 🤝 Support
 
 For support and questions:
-- Create an issue in the GitHub repository
-- Check the troubleshooting section above
-- Review the API documentation
+- Check the troubleshooting section
+- Review console logs for error details
+- Verify Google Sheets permissions and setup
+- Ensure all environment variables are correctly configured
 
-## 🔄 Version History
+## 🎯 Future Enhancements
 
-- **v1.0.0** - Initial release with core functionality
-  - Operator ID verification
-  - Google Sheets integration
-  - Video assessment system
-  - Real-time response tracking
-- **v1.1.0** - Enhanced video playback
-  - Dynamic video duration detection
-  - Real-time timer updates
-  - Smart auto-progression
-  - Firebase video integration
-- **v1.2.0** - UI/UX improvements
-  - Clean interface design
-  - Hidden backend details
-  - Professional assessment flow
-  - Responsive design
+- [ ] Real-time analytics dashboard
+- [ ] Bulk exam management
+- [ ] Advanced reporting features
+- [ ] Multi-language support
+- [ ] Mobile-responsive design improvements
+- [ ] Automated testing suite
+- [ ] Performance monitoring
+- [ ] Data export functionality
 
 ---
 
-**Built with ❤️ for comprehensive online assessments**
+**Version**: 2.0.0  
+**Last Updated**: September 2025  
+**Maintainer**: Exam Portal Development Team
