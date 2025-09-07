@@ -24,6 +24,61 @@ const VideoPlayer = ({ operatorId, onExamComplete }) => {
   const spacebarPressTime = useRef(null);
   const hasUserResponded = useRef(false);
 
+
+
+
+
+const handleVideoComplete = useCallback(() => {
+    console.log("Video ended. Running handleVideoComplete");
+  setIsPlaying(false);
+  setShowNextButton(true); // ensure button shows after video ends
+
+  const currentVideo = getCurrentVideo();
+  if (!currentVideo) return;
+
+  const result = calculateScore(currentVideo);
+
+  const response = {
+    clipId: currentVideo.clipId,
+    videoTitle: currentVideo.videoTitle,
+    hasIntervention: currentVideo.hasIntervention,
+    correctTime: currentVideo.correctTime,
+    userPressTime: spacebarPressTime.current,
+    reactionTime: result.reactionTime,
+    score: result.score,
+    feedback: result.feedback,
+    timestamp: new Date().toISOString()
+  };
+
+  setResponses(prev => [...prev, response]);
+  submitResponse(response);
+
+  // setShowResponse({ type: 'result', ...result });
+  // setTimeout(() => {
+  //   setShowResponse(null);
+  //   if (hasUserResponded.current) {
+  //     moveToNextVideo();
+  //   }
+    setTimeout(() => {
+    if (hasUserResponded.current) {
+      moveToNextVideo();
+    }
+  }, 2000);
+}, [  videos, 
+    currentVideoIndex, 
+    operatorId, 
+    sessionId, 
+    onExamComplete, 
+    responses]);
+
+
+
+
+
+
+
+
+
   // Fetch videos on component mount
   useEffect(() => {
     fetchVideos();
@@ -127,44 +182,88 @@ useEffect(() => {
 
 // new updated version 1:
 
+// useEffect(() => {
+//   const video = videoRef.current;
+//   if (!video) return;
+
+//   const handleTimeUpdate = () => {
+//     setCurrentTime(video.currentTime);
+//   };
+
+//   const handleVideoEnd = () => {
+//     handleVideoComplete();
+//   };
+
+//   const handleLoadedMetadata = () => {
+//     const duration = video.duration || 120;
+//     setVideoDuration(duration);
+//     console.log('📏 Metadata loaded, duration =', duration);
+
+//     // ✅ Try autoplay
+//     video.play().then(() => {
+//       console.log('▶️ Auto-play started');
+//       setIsPlaying(true);
+//       setVideoStartTime(Date.now());
+//     }).catch(err => {
+//       console.warn('🔇 Auto-play failed:', err);
+//     });
+//   };
+
+//   video.addEventListener('timeupdate', handleTimeUpdate);
+//   video.addEventListener('ended', handleVideoEnd);
+//   video.addEventListener('loadedmetadata', handleLoadedMetadata);
+
+//   return () => {
+//     video.removeEventListener('timeupdate', handleTimeUpdate);
+//     video.removeEventListener('ended', handleVideoEnd);
+//     video.removeEventListener('loadedmetadata', handleLoadedMetadata);
+//   };
+// }, [currentVideoIndex, handleVideoComplete]);
+
+
+
+// new updated version 2:
+
 useEffect(() => {
   const video = videoRef.current;
   if (!video) return;
+
+  console.log("🎯 useEffect (video setup) running for video:", currentVideo?.videoTitle);
 
   const handleTimeUpdate = () => {
     setCurrentTime(video.currentTime);
   };
 
   const handleVideoEnd = () => {
-    handleVideoComplete();
+    console.log("🎬 Native ended event fired");
+    handleVideoComplete(); // <--- This is what’s not being triggered in your first video
   };
 
   const handleLoadedMetadata = () => {
     const duration = video.duration || 120;
     setVideoDuration(duration);
-    console.log('📏 Metadata loaded, duration =', duration);
+    console.log("📏 Metadata loaded, duration =", duration);
 
-    // ✅ Try autoplay
     video.play().then(() => {
-      console.log('▶️ Auto-play started');
+      console.log("▶️ Auto-play started");
       setIsPlaying(true);
       setVideoStartTime(Date.now());
     }).catch(err => {
-      console.warn('🔇 Auto-play failed:', err);
+      console.warn("🔇 Auto-play failed:", err);
     });
   };
 
-  video.addEventListener('timeupdate', handleTimeUpdate);
-  video.addEventListener('ended', handleVideoEnd);
-  video.addEventListener('loadedmetadata', handleLoadedMetadata);
+  video.addEventListener("timeupdate", handleTimeUpdate);
+  video.addEventListener("ended", handleVideoEnd);
+  video.addEventListener("loadedmetadata", handleLoadedMetadata);
 
   return () => {
-    video.removeEventListener('timeupdate', handleTimeUpdate);
-    video.removeEventListener('ended', handleVideoEnd);
-    video.removeEventListener('loadedmetadata', handleLoadedMetadata);
+    console.log("♻️ Cleaning up video event listeners");
+    video.removeEventListener("timeupdate", handleTimeUpdate);
+    video.removeEventListener("ended", handleVideoEnd);
+    video.removeEventListener("loadedmetadata", handleLoadedMetadata);
   };
-}, [currentVideoIndex]);
-
+}, [currentVideoIndex, handleVideoComplete]);
 
 
 
@@ -349,46 +448,46 @@ useEffect(() => {
   };
 
 
-  const handleVideoComplete = () => {
-    setIsPlaying(false);
-    const currentVideo = getCurrentVideo();
-    if (!currentVideo) return;
+  // const handleVideoComplete = () => {
+  //   setIsPlaying(false);
+  //   const currentVideo = getCurrentVideo();
+  //   if (!currentVideo) return;
 
-    // Calculate score based on response
-    const result = calculateScore(currentVideo);
+  //   // Calculate score based on response
+  //   const result = calculateScore(currentVideo);
 
-    // Store response
-    const response = {
-      clipId: currentVideo.clipId,
-      videoTitle: currentVideo.videoTitle,
-      hasIntervention: currentVideo.hasIntervention,
-      correctTime: currentVideo.correctTime,
-      userPressTime: spacebarPressTime.current,
-      reactionTime: result.reactionTime,
-      score: result.score,
-      feedback: result.feedback,
-      timestamp: new Date().toISOString()
-    };
+  //   // Store response
+  //   const response = {
+  //     clipId: currentVideo.clipId,
+  //     videoTitle: currentVideo.videoTitle,
+  //     hasIntervention: currentVideo.hasIntervention,
+  //     correctTime: currentVideo.correctTime,
+  //     userPressTime: spacebarPressTime.current,
+  //     reactionTime: result.reactionTime,
+  //     score: result.score,
+  //     feedback: result.feedback,
+  //     timestamp: new Date().toISOString()
+  //   };
 
-    setResponses(prev => [...prev, response]);
-    console.log('📊 Video response recorded:', response);
+  //   setResponses(prev => [...prev, response]);
+  //   console.log('📊 Video response recorded:', response);
 
-    // Submit to backend
-    submitResponse(response);
+  //   // Submit to backend
+  //   submitResponse(response);
 
-    // Show result briefly
-    setShowResponse({ type: 'result', ...result });
-    setTimeout(() => {
-      setShowResponse(null);
-      // Auto-advance only if spacebar was pressed
-      if (hasUserResponded.current) {
-        moveToNextVideo();
-      } else {
-        // If no spacebar press, show Next button for manual progression
-        setShowNextButton(true);
-      }
-    }, 2000);
-  };
+  //   // Show result briefly
+  //   setShowResponse({ type: 'result', ...result });
+  //   setTimeout(() => {
+  //     setShowResponse(null);
+  //     // Auto-advance only if spacebar was pressed
+  //     if (hasUserResponded.current) {
+  //       moveToNextVideo();
+  //     } else {
+  //       // If no spacebar press, show Next button for manual progression
+  //       setShowNextButton(true);
+  //     }
+  //   }, 2000);
+  // };
 
   const calculateScore = (video) => {
     const { hasIntervention, correctTime } = video;
@@ -765,7 +864,7 @@ useEffect(() => {
                     }
 
                     {/* Start button for Firebase videos */}
-                    {!isPlaying && (
+                    {!isPlaying && !showNextButton &&(
                       <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-70">
                         <button
                           onClick={startVideo}
@@ -880,11 +979,12 @@ useEffect(() => {
 
               <div className="text-right">
                 {showNextButton && (
+                  
                   <button
                     onClick={moveToNextVideo}
                     className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold transition-all duration-200 hover:scale-105 shadow-lg"
                   >
-                    Next Video →
+                     {currentVideoIndex === videos.length - 1 ? 'Submit' : 'Next Video →'}
                   </button>
                 )}
               </div>
@@ -894,7 +994,7 @@ useEffect(() => {
       </div>
 
       {/* Instructions - Only show for first video and before it starts */}
-      {currentVideoIndex === 0 && !isPlaying && (
+      {currentVideoIndex === 0 && !isPlaying && !showNextButton &&(
         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 mb-4">
           <div className="flex items-start space-x-3">
             <svg className="w-6 h-6 text-yellow-600 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
