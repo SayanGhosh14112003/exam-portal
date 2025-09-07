@@ -419,7 +419,7 @@ class GoogleSheetsService {
         
         // If no existing columns, add basic headers first
         if (existingColumns.length === 0) {
-          newHeaderRow.unshift('Operator_ID', 'Session_ID', 'Start_Time', 'End_Time', 'Total_Score');
+          newHeaderRow.unshift('Exam_ID', 'Operator_ID', 'Session_ID', 'Start_Time', 'End_Time', 'Total_Score');
         }
 
         // Update the header row in the Exam_Results spreadsheet

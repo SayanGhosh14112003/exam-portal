@@ -321,9 +321,9 @@ Your main Google Sheet should have the following structure:
 ### Exam_Results Spreadsheet
 The system automatically creates an Exam_Results spreadsheet with the following structure:
 
-| Operator_ID | Session_ID | Start_Time | End_Time | Total_Score | Ok934 | Ok935 | Ok936 |
-|-------------|------------|------------|----------|-------------|-------|-------|-------|
-| 1234        | session_123| 2025-09-07 | 2025-09-07| 85%         | 1     | 0     | 1     |
+| Exam_ID | Operator_ID | Session_ID | Start_Time | End_Time | Total_Score | Ok934 | Ok935 | Ok936 |
+|---------|-------------|------------|------------|----------|-------------|-------|-------|-------|
+| exam_001| 1234        | session_123| 2025-09-07 | 2025-09-07| 85%         | 1     | 0     | 1     |
 
 **Important**: 
 - The Exam_Results spreadsheet ID is: `16Z0UWUup7zk3Rw2rOXXCW16o8XzNyrDVXNtt0EP7r0s`
