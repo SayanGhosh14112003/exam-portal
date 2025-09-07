@@ -120,11 +120,18 @@ const VideoPlayer = ({ operatorId, onExamComplete }) => {
 // new version 2:
 
 const handleVideoComplete = useCallback(() => {
-  console.log("Video ended. Running handleVideoComplete");
+  const currentVideo = getCurrentVideo();
+  console.log(`🎬 Video completed: ${currentVideo?.videoTitle} (${currentVideo?.clipId}) - Index: ${currentVideoIndex}`);
+  
+  // Prevent duplicate completion calls for the same video
+  if (showNextButton) {
+    console.log("⚠️ Video already completed, skipping duplicate call");
+    return;
+  }
+  
   setIsPlaying(false);
   setShowNextButton(true); // ensure button shows after video ends
 
-  const currentVideo = getCurrentVideo();
   if (!currentVideo) return;
 
   // Mark this video as viewed
@@ -158,6 +165,11 @@ const handleVideoComplete = useCallback(() => {
 
 
     const handleVideoCompleteRef = useRef(handleVideoComplete);
+    
+    // Update ref when function changes
+    useEffect(() => {
+      handleVideoCompleteRef.current = handleVideoComplete;
+    }, [handleVideoComplete]);
 
 
 
@@ -369,7 +381,21 @@ const handleVideoComplete = useCallback(() => {
     console.log("🎯 useEffect (video setup) running for video:", currentVideo?.videoTitle);
 
     const handleTimeUpdate = () => {
-      setCurrentTime(video.currentTime);
+      const currentTime = video.currentTime;
+      const duration = video.duration;
+      setCurrentTime(currentTime);
+      
+      // Check if video is near the end (within 0.5 seconds) and ensure Next button shows
+      if (duration && currentTime >= duration - 0.5 && !showNextButton) {
+        console.log("🎯 Video near end, ensuring Next button shows");
+        setShowNextButton(true);
+        
+        // Also trigger video complete logic if not already triggered
+        if (currentTime >= duration - 0.1) {
+          console.log("🎬 Video ended via timeupdate check");
+          handleVideoCompleteRef.current();
+        }
+      }
     };
 
     // This now uses the ref to call the up-to-date function
@@ -386,13 +412,37 @@ const handleVideoComplete = useCallback(() => {
     video.addEventListener("ended", handleVideoEnd);
     video.addEventListener("loadedmetadata", handleLoadedMetadata);
 
+    // Fallback timeout to ensure Next button appears
+    const fallbackTimeout = setTimeout(() => {
+      if (!showNextButton && video.duration && video.currentTime >= video.duration * 0.95) {
+        console.log("⏰ Fallback timeout: Ensuring Next button shows");
+        setShowNextButton(true);
+        handleVideoCompleteRef.current();
+      }
+    }, (video.duration || 60) * 1000 + 1000); // Video duration + 1 second buffer
+
     return () => {
       console.log("♻️ Cleaning up video event listeners");
       video.removeEventListener("timeupdate", handleTimeUpdate);
       video.removeEventListener("ended", handleVideoEnd);
       video.removeEventListener("loadedmetadata", handleLoadedMetadata);
+      clearTimeout(fallbackTimeout);
     };
-  }, [currentVideoIndex]); // The dependency array is correct
+  }, [currentVideoIndex]); // Only re-run when video changes, not when button state changes
+
+  // Additional fallback: Ensure Next button appears after video duration
+  useEffect(() => {
+    if (isPlaying && videoDuration > 0 && !showNextButton) {
+      console.log("⏰ Setting fallback timer for Next button:", videoDuration, "seconds");
+      const timer = setTimeout(() => {
+        console.log("⏰ Fallback timer: Showing Next button after", videoDuration, "seconds");
+        setShowNextButton(true);
+        handleVideoCompleteRef.current();
+      }, (videoDuration + 1) * 1000); // Video duration + 1 second
+
+      return () => clearTimeout(timer);
+    }
+  }, [isPlaying, videoDuration, showNextButton]);
 
 
 
@@ -470,8 +520,13 @@ const handleVideoComplete = useCallback(() => {
 
   //new modified version
   const startVideo = async () => {
-
     const currentVideo = getCurrentVideo();
+    console.log(`🎬 Starting video ${currentVideoIndex + 1}/${videos.length}: ${currentVideo?.videoTitle} (${currentVideo?.clipId})`);
+    
+    if (!currentVideo) {
+      console.error('❌ No current video found for index:', currentVideoIndex);
+      return;
+    }
 
     if (currentVideo?.driveLink) {
       if (currentVideo.driveLink.includes('drive.google.com')) {
@@ -627,20 +682,20 @@ const handleVideoComplete = useCallback(() => {
       window.demoInterval = null;
     }
 
+    const nextIndex = currentVideoIndex + 1;
     console.log('🔄 Moving to next video:', {
       currentVideoIndex,
+      nextIndex,
       totalVideos: videos.length,
       responsesCount: responses.length,
       viewedVideosCount: viewedVideos.size,
       isLastVideo: currentVideoIndex >= videos.length - 1
     });
 
-    // Safety check: Only allow exam completion if all videos have been viewed
-    const allVideosViewed = viewedVideos.size >= videos.length;
-
     if (currentVideoIndex < videos.length - 1) {
-      console.log('➡️ Moving to next video');
-      setCurrentVideoIndex(prev => prev + 1);
+      console.log(`➡️ Moving from video ${currentVideoIndex + 1} to video ${nextIndex + 1}`);
+      
+      // Reset all states before moving to next video
       setCurrentTime(0);
       setVideoDuration(0);
       setIsPlaying(false);
@@ -648,14 +703,13 @@ const handleVideoComplete = useCallback(() => {
       spacebarPressTime.current = null;
       setShowResponse(null);
       setShowNextButton(false);
-    } else if (allVideosViewed) {
-      // Exam complete - only if all videos have been viewed
-      console.log('🏁 All videos viewed, finishing exam');
-      handleExamComplete();
+      
+      // Move to next video index
+      setCurrentVideoIndex(nextIndex);
     } else {
-      // This should not happen, but safeguard against incomplete exams
-      console.warn('⚠️ Attempted to complete exam without all videos viewed');
-      alert('Please view all videos before finishing the exam.');
+      // We're on the last video - complete the exam
+      console.log('🏁 On last video, completing exam');
+      handleExamComplete();
     }
   };
 
@@ -1056,17 +1110,10 @@ const handleVideoComplete = useCallback(() => {
 
                   <button
                     onClick={moveToNextVideo}
-                    disabled={currentVideoIndex === videos.length - 1 && viewedVideos.size < videos.length}
-                    className={`px-6 py-3 rounded-lg font-semibold transition-all duration-200 ${
-                      currentVideoIndex === videos.length - 1 && viewedVideos.size < videos.length
-                        ? 'bg-gray-400 text-gray-700 cursor-not-allowed'
-                        : 'bg-blue-600 hover:bg-blue-700 text-white hover:scale-105 shadow-lg'
-                    }`}
+                    className="px-6 py-3 rounded-lg font-semibold transition-all duration-200 bg-blue-600 hover:bg-blue-700 text-white hover:scale-105 shadow-lg"
                   >
                     {currentVideoIndex === videos.length - 1 
-                      ? viewedVideos.size < videos.length
-                        ? `View All Videos First (${viewedVideos.size}/${videos.length})`
-                        : `Complete Exam ✓ (${viewedVideos.size}/${videos.length})`
+                      ? `Complete Exam ✓ (${currentVideoIndex + 1}/${videos.length})`
                       : `Next Video → (${currentVideoIndex + 1}/${videos.length})`}
                   </button>
                 )}
