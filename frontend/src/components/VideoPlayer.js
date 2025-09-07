@@ -143,13 +143,8 @@ const handleVideoComplete = useCallback(() => {
   setResponses(prev => [...prev, response]);
   submitResponse(response);
 
-  /* This entire block is now correctly commented out and will not cause an error.
-  setTimeout(() => {
-    // if (hasUserResponded.current) {
-    moveToNextVideo();
-    // }
-  });
-  */
+  // Show the Next Video button - user must manually proceed
+  // This ensures users don't accidentally skip videos
 
 }, [videos,
   currentVideoIndex,
@@ -569,7 +564,7 @@ const handleVideoComplete = useCallback(() => {
 
     if (hasIntervention) {
       // Case A: Clip WITH Intervention
-      if (userPressed && pressTime !== null) {
+      if (userPressed && pressTime !== null && correctTime !== null) {
         const timeDiff = pressTime - correctTime;
         const withinWindow = Math.abs(timeDiff) <= 1.5;
 
@@ -628,7 +623,18 @@ const handleVideoComplete = useCallback(() => {
       window.demoInterval = null;
     }
 
+    console.log('🔄 Moving to next video:', {
+      currentVideoIndex,
+      totalVideos: videos.length,
+      responsesCount: responses.length,
+      isLastVideo: currentVideoIndex >= videos.length - 1
+    });
+
+    // Safety check: Only allow exam completion if all videos have been attempted
+    const allVideosAttempted = responses.length >= videos.length;
+
     if (currentVideoIndex < videos.length - 1) {
+      console.log('➡️ Moving to next video');
       setCurrentVideoIndex(prev => prev + 1);
       setCurrentTime(0);
       setVideoDuration(0);
@@ -637,9 +643,14 @@ const handleVideoComplete = useCallback(() => {
       spacebarPressTime.current = null;
       setShowResponse(null);
       setShowNextButton(false);
-    } else {
-      // Exam complete
+    } else if (allVideosAttempted) {
+      // Exam complete - only if all videos have been attempted
+      console.log('🏁 All videos completed, finishing exam');
       handleExamComplete();
+    } else {
+      // This should not happen, but safeguard against incomplete exams
+      console.warn('⚠️ Attempted to complete exam without all videos attempted');
+      alert('Please complete all videos before finishing the exam.');
     }
   };
 
@@ -786,9 +797,26 @@ const handleVideoComplete = useCallback(() => {
         {currentVideo && (
           <>
             <div className="mb-4">
-              <h2 className="text-xl font-semibold text-gray-800 mb-2">
-                {currentVideo.videoTitle || `Video ${currentVideoIndex + 1}`}
-              </h2>
+              <div className="flex justify-between items-center mb-2">
+                <h2 className="text-xl font-semibold text-gray-800">
+                  {currentVideo.videoTitle || `Video ${currentVideoIndex + 1}`}
+                </h2>
+                <div className="text-sm font-medium text-gray-600 bg-gray-100 px-3 py-1 rounded-full">
+                  Video {currentVideoIndex + 1} of {videos.length}
+                </div>
+              </div>
+              
+              {/* Progress bar */}
+              <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
+                <div 
+                  className="bg-blue-600 h-2 rounded-full transition-all duration-300" 
+                  style={{ width: `${((currentVideoIndex + 1) / videos.length) * 100}%` }}
+                ></div>
+              </div>
+              
+              <div className="text-xs text-gray-500">
+                Progress: {responses.length} of {videos.length} videos completed
+              </div>
             </div>
 
             {/* Video Element */}
@@ -1035,9 +1063,18 @@ const handleVideoComplete = useCallback(() => {
 
                   <button
                     onClick={moveToNextVideo}
-                    className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold transition-all duration-200 hover:scale-105 shadow-lg"
+                    disabled={currentVideoIndex === videos.length - 1 && responses.length < videos.length}
+                    className={`px-6 py-3 rounded-lg font-semibold transition-all duration-200 ${
+                      currentVideoIndex === videos.length - 1 && responses.length < videos.length
+                        ? 'bg-gray-400 text-gray-700 cursor-not-allowed'
+                        : 'bg-blue-600 hover:bg-blue-700 text-white hover:scale-105 shadow-lg'
+                    }`}
                   >
-                    {currentVideoIndex === videos.length - 1 ? 'Submit' : 'Next Video →'}
+                    {currentVideoIndex === videos.length - 1 
+                      ? responses.length < videos.length
+                        ? `Complete All Videos First (${responses.length}/${videos.length})`
+                        : `Complete Exam ✓ (${responses.length}/${videos.length})`
+                      : `Next Video → (${currentVideoIndex + 1}/${videos.length})`}
                   </button>
                 )}
               </div>
