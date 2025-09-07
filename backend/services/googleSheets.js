@@ -4,6 +4,7 @@ class GoogleSheetsService {
   constructor() {
     this.sheets = null;
     this.spreadsheetId = process.env.GOOGLE_SHEETS_SPREADSHEET_ID;
+    this.examResultsSpreadsheetId = process.env.EXAM_RESULTS_SPREADSHEET_ID || '16Z0UWUup7zk3Rw2rOXXCW16o8XzNyrDVXNtt0EP7r0s';
     this.initialize();
   }
 
@@ -346,6 +347,108 @@ class GoogleSheetsService {
       
     } catch (error) {
       console.error('❌ Error force processing video links:', error);
+      throw error;
+    }
+  }
+
+  async setupExamResultsSheet() {
+    try {
+      if (!this.sheets || !this.spreadsheetId || !this.examResultsSpreadsheetId) {
+        throw new Error('Google Sheets service not properly initialized');
+      }
+
+      console.log('📊 Setting up Exam_Results sheet...');
+      console.log('📊 QuestionBank Spreadsheet ID:', this.spreadsheetId);
+      console.log('📊 Exam_Results Spreadsheet ID:', this.examResultsSpreadsheetId);
+
+      // First, get all Clip_IDs from QuestionBank (in the main spreadsheet)
+      const questionBankResponse = await this.sheets.spreadsheets.values.get({
+        spreadsheetId: this.spreadsheetId,
+        range: 'Sheet1!A:A', // Only Clip_ID column
+      });
+
+      const questionBankRows = questionBankResponse.data.values || [];
+      if (questionBankRows.length <= 1) {
+        console.log('📋 No Clip_IDs found in QuestionBank');
+        return { processed: 0, created: 0, existing: 0 };
+      }
+
+      // Extract Clip_IDs (skip header row)
+      const clipIds = questionBankRows.slice(1)
+        .map(row => row[0])
+        .filter(clipId => clipId && clipId.trim()); // Filter out empty values
+
+      console.log(`📋 Found ${clipIds.length} Clip_IDs in QuestionBank:`, clipIds);
+
+      // Now check Exam_Results sheet (Sheet1) and see which columns exist
+      // We'll assume Exam_Results is in the same spreadsheet but we need to check the structure
+      // For now, let's create a simple structure with Clip_ID columns
+
+      // Get current Exam_Results sheet structure (from the separate Exam_Results spreadsheet)
+      let examResultsResponse;
+      let existingColumns = [];
+      
+      try {
+        examResultsResponse = await this.sheets.spreadsheets.values.get({
+          spreadsheetId: this.examResultsSpreadsheetId,
+          range: 'Sheet1!1:1', // First row to check existing columns (Exam_Results spreadsheet uses Sheet1)
+        });
+        existingColumns = examResultsResponse.data.values?.[0] || [];
+        console.log('📋 Existing columns in Exam_Results:', existingColumns);
+      } catch (error) {
+        console.log('📋 Exam_Results sheet not accessible:', error.message);
+        // If we can't access the Exam_Results sheet, we'll try to create the structure
+        // But since it's a separate spreadsheet, we'll assume it exists and just log the error
+        console.log('⚠️ Exam_Results spreadsheet exists but may need proper permissions');
+        existingColumns = [];
+      }
+
+      // Determine which Clip_ID columns need to be created
+      const columnsToCreate = clipIds.filter(clipId => !existingColumns.includes(clipId));
+      const existingColumnsCount = clipIds.filter(clipId => existingColumns.includes(clipId)).length;
+
+      console.log(`📊 Columns to create: ${columnsToCreate.length}`);
+      console.log(`📊 Existing columns: ${existingColumnsCount}`);
+
+      let createdColumns = 0;
+
+      // Create missing columns by adding them to the header row
+      if (columnsToCreate.length > 0) {
+        // Prepare the header row with existing columns + new Clip_ID columns
+        const newHeaderRow = [...existingColumns, ...columnsToCreate];
+        
+        // If no existing columns, add basic headers first
+        if (existingColumns.length === 0) {
+          newHeaderRow.unshift('Operator_ID', 'Session_ID', 'Start_Time', 'End_Time', 'Total_Score');
+        }
+
+        // Update the header row in the Exam_Results spreadsheet
+        await this.sheets.spreadsheets.values.update({
+          spreadsheetId: this.examResultsSpreadsheetId,
+          range: 'Sheet1!1:1', // Exam_Results spreadsheet uses Sheet1
+          valueInputOption: 'RAW',
+          resource: {
+            values: [newHeaderRow]
+          }
+        });
+
+        createdColumns = columnsToCreate.length;
+        console.log(`✅ Created ${createdColumns} new Clip_ID columns in Exam_Results`);
+      }
+
+      const result = {
+        processed: clipIds.length,
+        created: createdColumns,
+        existing: existingColumnsCount,
+        clipIds: clipIds,
+        newColumns: columnsToCreate
+      };
+
+      console.log('🎯 Exam_Results sheet setup complete:', result);
+      return result;
+
+    } catch (error) {
+      console.error('❌ Error setting up Exam_Results sheet:', error);
       throw error;
     }
   }

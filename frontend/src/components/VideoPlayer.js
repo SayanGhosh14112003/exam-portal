@@ -1,4 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
+// import React, { useState, useEffect, useRef } from 'react';
+
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+
+
 import axios from 'axios';
 
 const VideoPlayer = ({ operatorId, onExamComplete }) => {
@@ -35,7 +39,25 @@ const VideoPlayer = ({ operatorId, onExamComplete }) => {
     };
   }, []);
 
-  // Set up spacebar listener with multiple capture points
+
+
+
+
+//new added
+
+// Auto-start the video whenever currentVideoIndex changes
+useEffect(() => {
+  if (videos.length > 0) {
+    startVideo();
+  }
+}, [currentVideoIndex]);
+
+
+
+  
+
+
+// Set up spacebar listener with multiple capture points
   useEffect(() => {
     const handleKeyDown = (event) => {
       if (event.code === 'Space' || event.key === ' ') {
@@ -182,7 +204,7 @@ useEffect(() => {
 
 
 
-  const fetchVideos = async () => {
+  const fetchVideos = useCallback(async () => {
     try {
       setIsLoading(true);
       const response = await axios.get('/api/videos');
@@ -199,7 +221,7 @@ useEffect(() => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   const handleSpacebarPress = () => {
     if (!isPlaying || !videoStartTime) return;

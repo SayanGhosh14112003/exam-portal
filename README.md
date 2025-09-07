@@ -262,6 +262,9 @@ router.post('/responses', async (req, res) => { ... }
 - npm or yarn
 - Google Cloud Platform account
 - Google Sheets API credentials
+- Two Google Spreadsheets:
+  - **QuestionBank Spreadsheet**: Contains video data (Clip_ID, Video_Title, etc.)
+  - **Exam_Results Spreadsheet**: Stores exam results and responses
 
 ## ⚙️ Installation
 
@@ -307,12 +310,25 @@ npm run client
 
 ## 📊 Google Sheets Configuration
 
-Your Google Sheet should have the following structure:
+### QuestionBank Spreadsheet
+Your main Google Sheet should have the following structure:
 
 | Clip_ID | Video_Title | Has_Intervention | Correct_Time | Is_Active | Drive_Link | Fire_Base_Link |
 |---------|-------------|------------------|--------------|-----------|------------|----------------|
 | Ok934   | testing 1   | TRUE            | 00:41        | YES       | https://drive.google.com/file/d/... | https://firebasestorage.googleapis.com/... |
 | Ok935   | testing 2   | FALSE           |              | YES       | https://drive.google.com/file/d/... | https://firebasestorage.googleapis.com/... |
+
+### Exam_Results Spreadsheet
+The system automatically creates an Exam_Results spreadsheet with the following structure:
+
+| Operator_ID | Session_ID | Start_Time | End_Time | Total_Score | Ok934 | Ok935 | Ok936 |
+|-------------|------------|------------|----------|-------------|-------|-------|-------|
+| 1234        | session_123| 2025-09-07 | 2025-09-07| 85%         | 1     | 0     | 1     |
+
+**Important**: 
+- The Exam_Results spreadsheet ID is: `16Z0UWUup7zk3Rw2rOXXCW16o8XzNyrDVXNtt0EP7r0s`
+- Make sure to share this spreadsheet with your service account email
+- The system automatically creates columns for each Clip_ID from the QuestionBank
 
 ### Column Descriptions:
 - **Clip_ID**: Unique identifier for each video

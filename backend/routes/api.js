@@ -192,4 +192,38 @@ router.post('/process-video-links', async (req, res) => {
   }
 });
 
+// Rules acceptance and Exam_Results sheet setup
+router.post('/accept-rules', async (req, res) => {
+  try {
+    const { operatorId } = req.body;
+    
+    if (!operatorId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Operator ID is required'
+      });
+    }
+    
+    console.log('📋 Rules accepted by operator:', operatorId);
+    
+    // Trigger Exam_Results sheet update
+    const result = await sheetsService.setupExamResultsSheet();
+    
+    res.json({
+      success: true,
+      message: 'Rules accepted and Exam_Results sheet updated',
+      operatorId,
+      examResultsSetup: result,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('❌ Error accepting rules:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to accept rules and setup Exam_Results',
+      error: error.message
+    });
+  }
+});
+
 module.exports = router;

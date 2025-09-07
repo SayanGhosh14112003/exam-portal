@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import axios from 'axios';
 
 const RulesSection = ({ operatorId, onProceedToExam }) => {
   const [hasAgreed, setHasAgreed] = useState(false);
@@ -55,18 +56,39 @@ const RulesSection = ({ operatorId, onProceedToExam }) => {
     }
   ];
 
-  const handleProceedToExam = () => {
+  const handleProceedToExam = async () => {
     if (!hasAgreed) {
       return;
     }
 
     setIsLoading(true);
     
-    // Simulate brief loading before proceeding to exam
-    setTimeout(() => {
-      onProceedToExam();
+    try {
+      // Call backend API to accept rules and setup Exam_Results sheet
+      console.log('📋 Accepting rules and setting up Exam_Results sheet...');
+      
+      const response = await axios.post('/api/accept-rules', {
+        operatorId: operatorId
+      });
+      
+      if (response.data.success) {
+        console.log('✅ Rules accepted and Exam_Results sheet updated:', response.data.examResultsSetup);
+        
+        // Brief delay to show the loading state
+        setTimeout(() => {
+          onProceedToExam();
+          setIsLoading(false);
+        }, 1000);
+      } else {
+        throw new Error(response.data.message || 'Failed to accept rules');
+      }
+    } catch (error) {
+      console.error('❌ Error accepting rules:', error);
       setIsLoading(false);
-    }, 800);
+      
+      // Show error message to user
+      alert(`Failed to accept rules: ${error.response?.data?.message || error.message}`);
+    }
   };
 
   const handleKeyPress = (e) => {
@@ -188,7 +210,7 @@ const RulesSection = ({ operatorId, onProceedToExam }) => {
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
-                Preparing Exam...
+                Setting up Exam...
               </>
             ) : (
               <>
