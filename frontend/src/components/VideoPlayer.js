@@ -134,6 +134,13 @@ const handleVideoComplete = useCallback(() => {
 
   if (!currentVideo) return;
 
+  // Check if we already have a response for this video
+  const existingResponse = responses.find(r => r.clipId === currentVideo.clipId);
+  if (existingResponse) {
+    console.log(`⚠️ Response already exists for ${currentVideo.clipId}, skipping duplicate`);
+    return;
+  }
+
   // Mark this video as viewed
   setViewedVideos(prev => new Set(prev).add(currentVideoIndex));
 
@@ -151,6 +158,8 @@ const handleVideoComplete = useCallback(() => {
     timestamp: new Date().toISOString()
   };
 
+  console.log(`📝 Creating response for ${currentVideo.clipId}:`, response);
+
   setResponses(prev => [...prev, response]);
   submitResponse(response);
 
@@ -161,7 +170,8 @@ const handleVideoComplete = useCallback(() => {
   currentVideoIndex,
   operatorId,
   sessionId,
-  onExamComplete]);
+  onExamComplete,
+  responses]);
 
 
     const handleVideoCompleteRef = useRef(handleVideoComplete);
@@ -700,7 +710,8 @@ const handleVideoComplete = useCallback(() => {
       setVideoDuration(0);
       setIsPlaying(false);
       hasUserResponded.current = false;
-      spacebarPressTime.current = null;
+      spacebarPressTime.current = 
+      null;
       setShowResponse(null);
       setShowNextButton(false);
       
@@ -713,14 +724,27 @@ const handleVideoComplete = useCallback(() => {
     }
   };
 
+  const [examSubmitted, setExamSubmitted] = useState(false);
+
   const handleExamComplete = async () => {
+    // Prevent duplicate submissions
+    if (examSubmitted) {
+      console.log('⚠️ Exam already submitted, skipping duplicate submission');
+      return;
+    }
+
+    setExamSubmitted(true);
+
     const totalScore = responses.reduce((sum, r) => sum + r.score, 0);
-    const percentage = ((totalScore / responses.length) * 100).toFixed(1);
+    const totalVideos = videos.length;
+    const percentage = totalVideos > 0 ? ((totalScore / totalVideos) * 100).toFixed(1) : '0.0';
 
     console.log('🎯 Exam completed!', {
       totalResponses: responses.length,
+      totalVideos: totalVideos,
       correctResponses: totalScore,
-      percentage: `${percentage}%`
+      percentage: `${percentage}%`,
+      responses: responses.map(r => ({ clipId: r.clipId, hasIntervention: r.hasIntervention, score: r.score }))
     });
 
     // Mark exam as "Submitted" when all clips are completed
@@ -741,6 +765,7 @@ const handleVideoComplete = useCallback(() => {
       responses,
       totalScore,
       percentage,
+      totalVideos,
       operatorId,
       sessionId
     });

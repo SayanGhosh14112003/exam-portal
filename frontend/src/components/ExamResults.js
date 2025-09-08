@@ -1,13 +1,23 @@
 import React from 'react';
 
 const ExamResults = ({ results, onRestart }) => {
-  const { responses, totalScore, percentage, operatorId, sessionId } = results;
+  const { responses, totalScore, percentage, totalVideos, operatorId, sessionId } = results;
 
   const interventionClips = responses.filter(r => r.hasIntervention);
   const nonInterventionClips = responses.filter(r => !r.hasIntervention);
   
   const interventionScore = interventionClips.reduce((sum, r) => sum + r.score, 0);
   const nonInterventionScore = nonInterventionClips.reduce((sum, r) => sum + r.score, 0);
+
+  // Debug logging for intervention classification
+  console.log('📊 ExamResults Debug:', {
+    totalResponses: responses.length,
+    interventionClips: interventionClips.length,
+    nonInterventionClips: nonInterventionClips.length,
+    interventionScore,
+    nonInterventionScore,
+    responses: responses.map(r => ({ clipId: r.clipId, hasIntervention: r.hasIntervention, score: r.score }))
+  });
 
   const averageReactionTime = interventionClips
     .filter(r => r.reactionTime !== null)
@@ -46,14 +56,14 @@ const ExamResults = ({ results, onRestart }) => {
       {/* Overall Score */}
       <div className={`bg-white rounded-xl shadow-sm border-2 p-8 mb-8 ${getScoreBgColor(percentage)}`}>
         <div className="text-center">
-          <div className="text-6xl font-bold mb-2 ${getScoreColor(percentage)}">
+          <div className={`text-6xl font-bold mb-2 ${getScoreColor(percentage)}`}>
             {percentage}%
           </div>
           <div className="text-2xl font-semibold text-gray-800 mb-4">
             Overall Score
           </div>
           <div className="text-lg text-gray-600">
-            {totalScore} out of {responses.length} clips answered correctly
+            {totalScore} out of {totalVideos || responses.length} clips answered correctly
           </div>
         </div>
       </div>
