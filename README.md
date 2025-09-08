@@ -2,6 +2,25 @@
 
 A comprehensive video-based examination system that tracks user responses and reaction times for intervention assessment. The system integrates with Google Sheets for data storage and provides real-time exam monitoring with automatic status tracking.
 
+## 🆕 Latest Updates (v2.1.0)
+
+### ✅ Fixed Issues
+- **Video Count Calculation**: Fixed percentage calculation to use total videos (3) instead of just responses
+- **Duplicate Submission Prevention**: Added safeguards to prevent multiple exam submissions
+- **Intervention Classification**: Enhanced logging and proper classification of intervention vs non-intervention clips
+- **Response Tracking**: Improved duplicate response detection and processing
+- **Results Display**: Updated to show correct totals (e.g., "2 out of 3 clips answered correctly")
+
+### 🔧 Technical Improvements
+- Enhanced error handling and debugging logs
+- Improved state management for exam completion
+- Better duplicate detection mechanisms
+- Comprehensive logging for troubleshooting
+- Fixed percentage calculation logic
+- Added examSubmitted state management
+- Enhanced response validation
+- Improved results display accuracy
+
 ## 🎯 Overview
 
 The Exam Portal is designed for assessment scenarios where users watch video clips and respond to interventions. The system tracks:
@@ -35,6 +54,8 @@ The Exam Portal is designed for assessment scenarios where users watch video cli
 - **No Fixed Exam IDs**: System adapts to any number of exams
 - **Session-based Tracking**: Each exam session is uniquely tracked
 - **Real-time Updates**: Immediate recording of responses
+- **Accurate Video Counting**: Proper calculation based on total videos in QuestionBank
+- **Duplicate Prevention**: Built-in safeguards against multiple submissions
 
 ### 2. Comprehensive Status Tracking
 - **"In Progress"**: Default status when exam starts
@@ -236,6 +257,10 @@ Ready for Exam Responses
 - `📝 Updating exam status:` - Status changes
 - `✅ Exam marked as Submitted` - Successful completion
 - `⚠️ Exam marked as Attempted` - Early exit detected
+- `🎯 Exam completed!` - Exam completion with detailed stats
+- `📊 ExamResults Debug:` - Results calculation debugging
+- `⚠️ Response already exists` - Duplicate response prevention
+- `⚠️ Exam already submitted` - Duplicate submission prevention
 
 ### Error Handling
 - Comprehensive error logging
@@ -291,6 +316,16 @@ curl -X POST http://localhost:5001/api/responses \
    - Verify `beforeunload` event listener
    - Check `sendBeacon` API support
    - Monitor console for error messages
+
+4. **Incorrect Video Count in Results**
+   - Ensure all videos in QuestionBank are marked as `Is_Active: Yes`
+   - Check that all 3 videos (Ok934, Ok935, Ok936) are being loaded
+   - Verify intervention classification in QuestionBank
+
+5. **Duplicate Submissions**
+   - Check console for "Exam already submitted" warnings
+   - Verify `examSubmitted` state is working correctly
+   - Monitor for "Response already exists" messages
 
 ### Debug Mode
 Enable detailed logging by setting `NODE_ENV=development` in your environment variables.
@@ -361,9 +396,32 @@ For support and questions:
 - [ ] Automated testing suite
 - [ ] Performance monitoring
 - [ ] Data export functionality
+- [ ] Enhanced video quality controls
+- [ ] Offline exam capability
+- [ ] Advanced result analytics
+
+## 📋 Current System Status
+
+### ✅ Working Features
+- ✅ Video playback and response tracking
+- ✅ Google Sheets integration
+- ✅ Real-time exam status updates
+- ✅ Early exit detection
+- ✅ Accurate video count calculation
+- ✅ Duplicate submission prevention
+- ✅ Proper intervention classification
+- ✅ Comprehensive error handling
+
+### 📊 Test Results
+- **Total Videos**: 3 (Ok934, Ok935, Ok936)
+- **Intervention Videos**: 2 (Ok934, Ok936)
+- **Non-Intervention Videos**: 1 (Ok935)
+- **Response Tracking**: ✅ Working
+- **Google Sheets**: ✅ Connected
+- **Duplicate Prevention**: ✅ Active
 
 ---
 
-**Version**: 2.0.0  
-**Last Updated**: September 2025  
+**Version**: 2.1.0  
+**Last Updated**: September 8, 2025  
 **Maintainer**: Exam Portal Development Team
