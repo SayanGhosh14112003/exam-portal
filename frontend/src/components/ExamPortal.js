@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import VideoPlayer from './VideoPlayer';
 import ExamResults from './ExamResults';
 
-const ExamPortal = ({ operatorId, onExamComplete }) => {
+const ExamPortal = ({ operatorId, examCode, onExamComplete }) => {
   const [examState, setExamState] = useState('ready'); // ready, active, completed
   const [examResults, setExamResults] = useState(null);
 
@@ -25,6 +25,7 @@ const ExamPortal = ({ operatorId, onExamComplete }) => {
     return (
       <VideoPlayer 
         operatorId={operatorId}
+        examCode={examCode}
         onExamComplete={handleExamComplete}
       />
     );
@@ -45,7 +46,10 @@ const ExamPortal = ({ operatorId, onExamComplete }) => {
         <div className="flex justify-between items-center">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Video Intervention Assessment</h1>
-            <p className="text-gray-600 mt-1">Operator: <span className="font-medium text-primary-600">{operatorId}</span></p>
+            <p className="text-gray-600 mt-1">
+              Operator: <span className="font-medium text-primary-600">{operatorId}</span>
+              {examCode && <span className="ml-4">Exam Code: <span className="font-medium text-blue-600">{examCode}</span></span>}
+            </p>
           </div>
           <div className="text-right">
             <div className="text-sm text-gray-500">Progress</div>

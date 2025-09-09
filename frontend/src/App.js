@@ -7,14 +7,16 @@ import './App.css';
 function App() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [operatorId, setOperatorId] = useState('');
+  const [examCode, setExamCode] = useState('');
   const [currentStep, setCurrentStep] = useState('welcome'); // welcome, rules, exam
 
   const handleBeginTest = () => {
     setIsModalOpen(true);
   };
 
-  const handleVerificationComplete = (verifiedId) => {
+  const handleVerificationComplete = (verifiedId, verifiedExamCode) => {
     setOperatorId(verifiedId);
+    setExamCode(verifiedExamCode);
     setIsModalOpen(false);
     setCurrentStep('rules');
   };
@@ -42,8 +44,9 @@ function App() {
               <h1 className="text-2xl font-bold text-gray-900">Exam Portal</h1>
             </div>
             {operatorId && (
-              <div className="flex items-center text-sm text-gray-600">
+              <div className="flex items-center text-sm text-gray-600 space-x-4">
                 <span className="font-medium">Operator ID: {operatorId}</span>
+                {examCode && <span className="font-medium">Exam Code: {examCode}</span>}
               </div>
             )}
           </div>
@@ -114,6 +117,7 @@ function App() {
         {currentStep === 'rules' && (
           <RulesSection 
             operatorId={operatorId}
+            examCode={examCode}
             onProceedToExam={handleProceedToExam}
           />
         )}
@@ -121,6 +125,7 @@ function App() {
         {currentStep === 'exam' && (
           <ExamPortal 
             operatorId={operatorId}
+            examCode={examCode}
             onExamComplete={handleExamComplete}
           />
         )}

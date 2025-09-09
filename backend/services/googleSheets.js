@@ -77,44 +77,88 @@ class GoogleSheetsService {
     }
   }
 
-  async getActiveVideos() {
+  async validateExamCode(examCode) {
+    try {
+      if (!this.sheets || !this.spreadsheetId) {
+        console.log('⚠️ Google Sheets not available - accepting any exam code in demo mode');
+        return true;
+      }
+
+      console.log('🔍 Validating exam code in QuestionBank:', examCode);
+
+      // Fetch exam codes from QuestionBank worksheet
+      // Columns: Exam_Code, Clip_ID, Video_Title, Has_Intervention, Correct_Time, Is_Active, Fire_Base_Link
+      const response = await this.sheets.spreadsheets.values.get({
+        spreadsheetId: this.spreadsheetId,
+        range: 'Sheet1!A:A', // Only Exam_Code column
+      });
+
+      const rows = response.data.values || [];
+      console.log(`📋 Found ${rows.length} total rows in QuestionBank`);
+
+      if (rows.length === 0) {
+        console.log('⚠️ No data found in QuestionBank');
+        return false;
+      }
+
+      // Skip header row and check if exam code exists (case-insensitive)
+      const examCodes = rows.slice(1)
+        .map(row => row[0])
+        .filter(code => code && code.trim()); // Filter out empty values
+
+      // Convert both the input exam code and stored codes to lowercase for comparison
+      const isValid = examCodes.some(code => code.toLowerCase() === examCode.toLowerCase());
+      
+      console.log(`🔍 Exam code "${examCode}" ${isValid ? 'found' : 'not found'} in QuestionBank`);
+      console.log(`📋 Available exam codes:`, examCodes);
+      
+      return isValid;
+    } catch (error) {
+      console.error('❌ Error validating exam code:', error);
+      throw error;
+    }
+  }
+
+  async getActiveVideos(examCode = null) {
     try {
       if (!this.sheets || !this.spreadsheetId) {
         console.log('⚠️ Google Sheets not available - returning demo videos');
         // Return demo videos for testing
         return [
           {
+            examCode: 'DEMO',
             clipId: 'DEMO_001',
-            videoTitle: 'Demo Video 1 - No Intervention',
+            videoTitle: 'DEMO_001',
             hasIntervention: false,
             correctTime: 15.5,
             isActive: true,
             driveLink: 'https://drive.google.com/file/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/preview',
-            originalDriveLink: 'https://drive.google.com/file/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/preview',
+            originalDriveLink: '',
             fireBaseLink: '',
             order: 1
           },
           {
+            examCode: 'DEMO',
             clipId: 'DEMO_002',
-            videoTitle: 'Demo Video 2 - With Intervention',
+            videoTitle: 'DEMO_002',
             hasIntervention: true,
             correctTime: 22.0,
             isActive: true,
             driveLink: 'https://drive.google.com/file/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/preview',
-            originalDriveLink: 'https://drive.google.com/file/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/preview',
+            originalDriveLink: '',
             fireBaseLink: '',
             order: 2
           }
         ];
       }
 
-      console.log('📊 Fetching active videos from QuestionBank worksheet...');
+      console.log('📊 Fetching active videos from QuestionBank worksheet...', { examCode });
 
       // Fetch video data from Sheet1 worksheet
-      // Columns: Clip_ID, Video_Title, Has_Intervention, Correct_Time, Is_Active, Drive_Link, Fire_Base_Link
+      // New structure: Exam_Code, Clip_ID, Has_Intervention, Correct_Time, Is_Active, Fire_Base_Link
       const response = await this.sheets.spreadsheets.values.get({
         spreadsheetId: this.spreadsheetId,
-        range: 'Sheet1!A:G', // Extended to include Fire_Base_Link column
+        range: 'Sheet1!A:F', // 6 columns for new structure
       });
 
       const rows = response.data.values || [];
@@ -127,13 +171,18 @@ class GoogleSheetsService {
       // Skip header row and filter for active videos
       const videos = rows.slice(1)
         .filter(row => {
+          // Filter by exam code if provided (case-insensitive)
+          if (examCode && row[0].toLowerCase() !== examCode.toLowerCase()) {
+            return false;
+          }
+          
           // Check if Is_Active column (index 4) is active (YES, TRUE, or true)
           const isActive = row[4] && (
             row[4].toString().toUpperCase() === 'YES' ||
             row[4].toString().toUpperCase() === 'TRUE' ||
             row[4] === true
           );
-          return isActive && row[0]; // Also ensure Clip_ID exists
+          return isActive && row[1]; // Also ensure Clip_ID exists (index 1)
         })
         .map((row, index) => {
           // Parse correct time - handle both "MM:SS" format and decimal seconds
@@ -150,46 +199,32 @@ class GoogleSheetsService {
             }
           }
           
-          // Use Fire_Base_Link if available, otherwise fall back to Drive_Link
+          // Use Fire_Base_Link directly (column F)
           let videoUrl = '';
-          const fireBaseLink = row[6] || ''; // Fire_Base_Link column (G)
-          const originalDriveLink = row[5] || ''; // Drive_Link column (F)
+          const fireBaseLink = row[5] || ''; // Fire_Base_Link column (F)
           
-          // Check if the Drive_Link column contains Firebase URLs (common case)
-          if (originalDriveLink.includes('firebasestorage.googleapis.com')) {
-            // Drive_Link column actually contains Firebase URL
-            videoUrl = originalDriveLink.trim();
-            console.log(`🔥 Using Firebase URL from Drive_Link for ${row[0]}: Firebase video URL`);
+          // Check if Fire_Base_Link contains Firebase URL
+          if (fireBaseLink.trim() && fireBaseLink.includes('firebasestorage.googleapis.com')) {
+            videoUrl = fireBaseLink.trim();
+            console.log(`🔥 Using Firebase URL for ${row[1]}: Firebase video URL`);
           } else if (fireBaseLink.trim() && fireBaseLink !== '1' && fireBaseLink !== '2' && fireBaseLink !== '3') {
             // Use Fire_Base_Link if it's not just a placeholder number
             videoUrl = fireBaseLink.trim();
-            console.log(`🔥 Using Fire_Base_Link for ${row[0]}: Firebase video URL`);
-          } else if (originalDriveLink.trim() && originalDriveLink !== '1' && originalDriveLink !== '2' && originalDriveLink !== '3') {
-            // Fall back to Drive_Link and convert to preview URL if it's not a placeholder
-            videoUrl = originalDriveLink.trim();
-            if (videoUrl.includes('drive.google.com')) {
-              // Extract file ID from Google Drive URL
-              const fileIdMatch = videoUrl.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
-              if (fileIdMatch) {
-                const fileId = fileIdMatch[1];
-                // Convert to direct preview URL
-                videoUrl = `https://drive.google.com/file/d/${fileId}/preview`;
-              }
-            }
-            console.log(`⚠️ Using Drive_Link for ${row[0]}: Fire_Base_Link not available`);
+            console.log(`🔗 Using Fire_Base_Link for ${row[1]}: ${videoUrl}`);
           } else {
-            console.warn(`❌ No valid video URL found for ${row[0]}: Both Fire_Base_Link and Drive_Link are empty or contain placeholder values`);
+            console.warn(`❌ No valid video URL found for ${row[1]}: Fire_Base_Link is empty or contains placeholder values`);
           }
           
           return {
-            clipId: row[0],
-            videoTitle: row[1] || '',
-            hasIntervention: row[2] && (row[2].toString().toUpperCase() === 'TRUE' || row[2] === true),
-            correctTime: correctTime,
+            examCode: row[0], // Exam_Code column (A)
+            clipId: row[1], // Clip_ID column (B)
+            videoTitle: row[1] || 'Video', // Use Clip_ID as title since Video_Title is removed
+            hasIntervention: row[2] && (row[2].toString().toUpperCase() === 'TRUE' || row[2] === true), // Has_Intervention column (C)
+            correctTime: correctTime, // Correct_Time column (D)
             isActive: true, // We already filtered for active videos
-            driveLink: videoUrl, // Primary video URL (Fire_Base_Link or processed Drive_Link)
-            originalDriveLink: originalDriveLink, // Original Drive_Link for reference
-            fireBaseLink: fireBaseLink, // Firebase video link for reference
+            driveLink: videoUrl, // Primary video URL (Fire_Base_Link)
+            originalDriveLink: '', // No longer applicable
+            fireBaseLink: fireBaseLink, // Firebase video link
             order: index + 1
           };
         });
@@ -411,7 +446,7 @@ class GoogleSheetsService {
     }
   }
 
-  async setupExamResultsSheet() {
+  async setupExamResultsSheet(examCode = null) {
     try {
       if (!this.sheets || !this.spreadsheetId || !this.examResultsSpreadsheetId) {
         console.log('⚠️ Google Sheets not available - returning demo response');
@@ -427,14 +462,14 @@ class GoogleSheetsService {
         };
       }
 
-      console.log('📊 Setting up Exam_Results sheet...');
+      console.log('📊 Setting up Exam_Results sheet...', { examCode });
       console.log('📊 QuestionBank Spreadsheet ID:', this.spreadsheetId);
       console.log('📊 Exam_Results Spreadsheet ID:', this.examResultsSpreadsheetId);
 
-      // First, get all Clip_IDs from QuestionBank (in the main spreadsheet)
+      // First, get all Clip_IDs from QuestionBank (in the main spreadsheet), filtered by exam code if provided
       const questionBankResponse = await this.sheets.spreadsheets.values.get({
         spreadsheetId: this.spreadsheetId,
-        range: 'Sheet1!A:A', // Only Clip_ID column
+        range: 'Sheet1!A:B', // Exam_Code and Clip_ID columns
       });
 
       const questionBankRows = questionBankResponse.data.values || [];
@@ -443,12 +478,18 @@ class GoogleSheetsService {
         return { processed: 0, created: 0, existing: 0 };
       }
 
-      // Extract Clip_IDs (skip header row)
+      // Extract Clip_IDs (skip header row), filter by exam code if provided
       const clipIds = questionBankRows.slice(1)
-        .map(row => row[0])
-        .filter(clipId => clipId && clipId.trim()); // Filter out empty values
+        .filter(row => {
+          // Filter by exam code if provided (case-insensitive)
+          if (examCode && row[0].toLowerCase() !== examCode.toLowerCase()) {
+            return false;
+          }
+          return row[1] && row[1].trim(); // Ensure Clip_ID exists
+        })
+        .map(row => row[1]); // Extract Clip_ID (column B)
 
-      console.log(`📋 Found ${clipIds.length} Clip_IDs in QuestionBank:`, clipIds);
+      console.log(`📋 Found ${clipIds.length} Clip_IDs in QuestionBank${examCode ? ` for exam code ${examCode}` : ''}:`, clipIds);
 
       // Get current Exam_Results sheet structure (from the separate Exam_Results spreadsheet)
       let examResultsResponse;
@@ -489,9 +530,9 @@ class GoogleSheetsService {
         // Prepare the header row with existing columns + new columns
         const newHeaderRow = [...existingColumns, ...columnsToCreate];
         
-        // If no existing columns, add basic headers first (matching existing structure)
+        // If no existing columns, add basic headers first (with new Exam_Code column)
         if (existingColumns.length === 0) {
-          newHeaderRow.unshift('User_ID', 'Start_Time', 'End_Time', 'Total_Score', 'Status');
+          newHeaderRow.unshift('Exam_Code', 'User_ID', 'Start_Time', 'End_Time', 'Total_Score', 'Status');
         }
 
         // Update the header row in the Exam_Results spreadsheet
@@ -566,7 +607,8 @@ class GoogleSheetsService {
         userPressTime, 
         reactionTime, 
         score,
-        sessionId
+        sessionId,
+        examCode
       } = responseData;
 
       console.log('📝 Recording exam response:', { operatorId, clipId, score, reactionTime, sessionId });
@@ -601,16 +643,21 @@ class GoogleSheetsService {
       const rows = dataResponse.data.values || [];
       let targetRowIndex = -1;
 
-      // Look for existing row with matching User_ID (which is the operatorId)
-      console.log(`🔍 Looking for existing row with User_ID: ${operatorId}`);
+      // Look for existing row with matching User_ID AND Exam_Code for the current attempt
+      // This is for recording individual video responses within the same exam session
+      console.log(`🔍 Looking for existing row with User_ID: ${operatorId} and Exam_Code: ${examCode}`);
       for (let i = 1; i < rows.length; i++) { // Skip header row
         const row = rows[i];
-        const rowUserId = row[0]; // User_ID column (index 0)
-        console.log(`   Row ${i}: User_ID = "${rowUserId}"`);
+        const rowExamCode = row[0]; // Exam_Code column (index 0)
+        const rowUserId = row[1]; // User_ID column (index 1, after Exam_Code)
+        console.log(`   Row ${i}: Exam_Code = "${rowExamCode}", User_ID = "${rowUserId}"`);
         
-        if (rowUserId === operatorId) {
+        // Match User_ID, Exam_Code, and "In Progress" status for the same attempt
+        // Only update rows that are still in progress (not completed attempts)
+        const rowStatus = row[5]; // Status column (index 5)
+        if (rowUserId === operatorId && rowExamCode === examCode && rowStatus === 'In Progress') {
           targetRowIndex = i + 1; // 1-based row index
-          console.log(`✅ Found existing row at index ${targetRowIndex}`);
+          console.log(`✅ Found existing "In Progress" row at index ${targetRowIndex} for same exam attempt`);
           break;
         }
       }
@@ -619,15 +666,16 @@ class GoogleSheetsService {
       if (targetRowIndex === -1) {
         console.log(`📝 Creating new row for User_ID: ${operatorId}`);
         const newRow = [
-          operatorId, // User_ID (index 0)
-          new Date().toISOString(), // Start_Time (index 1)
-          '', // End_Time (index 2) - will be updated when exam completes
-          0, // Total_Score (index 3) - will be calculated
-          'In Progress' // Status (index 4)
+          examCode || '', // Exam_Code (index 0)
+          operatorId, // User_ID (index 1)
+          new Date().toISOString(), // Start_Time (index 2)
+          '', // End_Time (index 3) - will be updated when exam completes
+          0, // Total_Score (index 4) - will be calculated
+          'In Progress' // Status (index 5)
         ];
 
-        // Add empty values for all Clip_ID columns (starting from index 5)
-        for (let i = 5; i < headers.length; i++) {
+        // Add empty values for all Clip_ID columns (starting from index 6)
+        for (let i = 6; i < headers.length; i++) {
           newRow.push('');
         }
 
@@ -700,9 +748,9 @@ class GoogleSheetsService {
         throw new Error('Google Sheets service not properly initialized');
       }
 
-      const { operatorId, sessionId, status, endTime, totalScore } = statusData;
+      const { operatorId, sessionId, status, endTime, totalScore, examCode } = statusData;
 
-      console.log('📝 Updating exam status:', { operatorId, sessionId, status, endTime, totalScore });
+      console.log('📝 Updating exam status:', { operatorId, sessionId, status, endTime, totalScore, examCode });
 
       // Get current Exam_Results sheet data
       const dataResponse = await this.sheets.spreadsheets.values.get({
@@ -713,26 +761,34 @@ class GoogleSheetsService {
       const rows = dataResponse.data.values || [];
       let targetRowIndex = -1;
 
-      // Look for existing row with matching User_ID (which is the operatorId)
+      // Look for existing row with matching User_ID, Exam_Code, and Status = "In Progress"
+      // This finds the row created during recordExamResponse() to update with final status
+      console.log(`🔍 Looking for existing "In Progress" row - User_ID: ${operatorId}, Exam_Code: ${examCode}`);
       for (let i = 1; i < rows.length; i++) { // Skip header row
         const row = rows[i];
-        const rowUserId = row[0]; // User_ID column (index 0)
+        const rowExamCode = row[0]; // Exam_Code column (index 0)
+        const rowUserId = row[1]; // User_ID column (index 1, after Exam_Code)
+        const rowStatus = row[5]; // Status column (index 5)
+        console.log(`   Row ${i}: Exam_Code = "${rowExamCode}", User_ID = "${rowUserId}", Status = "${rowStatus}"`);
         
-        if (rowUserId === operatorId) {
+        // Match User_ID, Exam_Code, and "In Progress" status
+        if (rowUserId === operatorId && rowExamCode === examCode && rowStatus === 'In Progress') {
           targetRowIndex = i + 1; // 1-based row index
+          console.log(`✅ Found existing "In Progress" row at index ${targetRowIndex} to update`);
           break;
         }
       }
 
       // If no existing row found, create a new one
       if (targetRowIndex === -1) {
-        console.log(`📝 Creating new row for User_ID: ${operatorId} during status update`);
+        console.log(`📝 No existing "In Progress" row found - creating new row for User_ID: ${operatorId} during status update`);
         const newRow = [
-          operatorId, // User_ID (index 0)
-          new Date().toISOString(), // Start_Time (index 1)
-          endTime || '', // End_Time (index 2)
-          totalScore || 0, // Total_Score (index 3)
-          status || 'Completed' // Status (index 4)
+          examCode || '', // Exam_Code (index 0) - store the actual exam code
+          operatorId, // User_ID (index 1)
+          new Date().toISOString(), // Start_Time (index 2)
+          endTime || '', // End_Time (index 3)
+          totalScore || 0, // Total_Score (index 4)
+          status || 'Completed' // Status (index 5)
         ];
 
         // Get headers to determine how many columns we need
@@ -743,8 +799,8 @@ class GoogleSheetsService {
 
         const headers = headerResponse.data.values?.[0] || [];
         
-        // Add empty values for all Clip_ID columns (starting from index 5)
-        for (let i = 5; i < headers.length; i++) {
+        // Add empty values for all Clip_ID columns (starting from index 6)
+        for (let i = 6; i < headers.length; i++) {
           newRow.push('');
         }
 

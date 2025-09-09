@@ -6,7 +6,7 @@ import axios from 'axios';
 
 
 
-const VideoPlayer = ({ operatorId, onExamComplete }) => {
+const VideoPlayer = ({ operatorId, examCode, onExamComplete }) => {
   const [videos, setVideos] = useState([]);
   const [currentVideoIndex, setCurrentVideoIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
@@ -26,98 +26,6 @@ const VideoPlayer = ({ operatorId, onExamComplete }) => {
   const spacebarPressTime = useRef(null);
   const hasUserResponded = useRef(false);
 
-
-
-
-
-
-  // const handleVideoComplete = useCallback(() => {
-  //   console.log("Video ended. Running handleVideoComplete");
-  //   setIsPlaying(false);
-  //   setShowNextButton(true); // ensure button shows after video ends
-
-  //   const currentVideo = getCurrentVideo();
-  //   if (!currentVideo) return;
-
-  //   const result = calculateScore(currentVideo);
-
-  //   const response = {
-  //     clipId: currentVideo.clipId,
-  //     videoTitle: currentVideo.videoTitle,
-  //     hasIntervention: currentVideo.hasIntervention,
-  //     correctTime: currentVideo.correctTime,
-  //     userPressTime: spacebarPressTime.current,
-  //     reactionTime: result.reactionTime,
-  //     score: result.score,
-  //     feedback: result.feedback,
-  //     timestamp: new Date().toISOString()
-  //   };
-
-  //   setResponses(prev => [...prev, response]);
-  //   submitResponse(response);
-
-  //   setTimeout(() => {
-  //     // if (hasUserResponded.current) {
-  //     moveToNextVideo();
-  //     // }
-
-  //   }
-
-  //   );
-  // }, [videos,
-  //   currentVideoIndex,
-  //   operatorId,
-  //   sessionId,
-  //   onExamComplete,
-  //   responses]);
-
-
-
-// new modified version
-
-
-// const handleVideoComplete = useCallback(() => {
-//   console.log("Video ended. Running handleVideoComplete");
-//   setIsPlaying(false);
-//   setShowNextButton(true); // ensure button shows after video ends
-
-//   const currentVideo = getCurrentVideo();
-//   if (!currentVideo) return;
-
-//   const result = calculateScore(currentVideo);
-
-//   const response = {
-//     clipId: currentVideo.clipId,
-//     videoTitle: currentVideo.videoTitle,
-//     hasIntervention: currentVideo.hasIntervention,
-//     correctTime: currentVideo.correctTime,
-//     userPressTime: spacebarPressTime.current,
-//     reactionTime: result.reactionTime,
-//     score: result.score,
-//     feedback: result.feedback,
-//     timestamp: new Date().toISOString()
-//   };
-
-//   setResponses(prev => [...prev, response]);
-//   submitResponse(response);
-
-//   /* This entire block is now correctly commented out and will not cause an error.
-//   setTimeout(() => {
-//     // if (hasUserResponded.current) {
-//     moveToNextVideo();
-//     // }
-//   });
-//   */
-
-// }, [videos,
-//   currentVideoIndex,
-//   operatorId,
-//   sessionId,
-//   onExamComplete,
-//   responses]);
-
-
-// new version 2:
 
 const handleVideoComplete = useCallback(() => {
   const currentVideo = getCurrentVideo();
@@ -279,105 +187,6 @@ const handleVideoComplete = useCallback(() => {
     };
   }, [isPlaying, videoStartTime]); // Dependencies updated
 
-
-  // new updated version 2:
-
-  // useEffect(() => {
-  //   const video = videoRef.current;
-  //   if (!video) return;
-
-  //   console.log("🎯 useEffect (video setup) running for video:", currentVideo?.videoTitle);
-
-  //   const handleTimeUpdate = () => {
-  //     setCurrentTime(video.currentTime);
-  //   };
-
-  //   const handleVideoEnd = () => {
-  //     console.log("🎬 Native ended event fired");
-  //     handleVideoComplete(); // <--- This is what’s not being triggered in your first video
-  //   };
-
-  //   const handleLoadedMetadata = () => {
-  //     const duration = video.duration || 120;
-  //     setVideoDuration(duration);
-  //     console.log("📏 Metadata loaded, duration =", duration);
-
-  //     video.play().then(() => {
-  //       console.log("▶️ Auto-play started");
-  //       setIsPlaying(true);
-  //       setVideoStartTime(Date.now());
-  //     }).catch(err => {
-  //       console.warn("🔇 Auto-play failed:", err);
-  //     });
-  //   };
-
-  //   video.addEventListener("timeupdate", handleTimeUpdate);
-  //   video.addEventListener("ended", handleVideoEnd);
-  //   video.addEventListener("loadedmetadata", handleLoadedMetadata);
-
-  //   return () => {
-  //     console.log("♻️ Cleaning up video event listeners");
-  //     video.removeEventListener("timeupdate", handleTimeUpdate);
-  //     video.removeEventListener("ended", handleVideoEnd);
-  //     video.removeEventListener("loadedmetadata", handleLoadedMetadata);
-  //   };
-  // }, [currentVideoIndex, handleVideoComplete]);
-
-
-
-
-
-// new version:
-
-
-
-  // useEffect(() => {
-  //   const video = videoRef.current;
-  //   if (!video) return;
-
-  //   console.log("🎯 useEffect (video setup) running for video:", currentVideo?.videoTitle);
-
-  //   const handleTimeUpdate = () => {
-  //     setCurrentTime(video.currentTime);
-  //   };
-
-  //   const handleVideoEnd = () => {
-  //     console.log("🎬 Native ended event fired");
-  //     handleVideoComplete(); // <--- This is what’s not being triggered in your first video
-  //   };
-
-  //   const handleLoadedMetadata = () => {
-  //     const duration = video.duration || 120;
-  //     setVideoDuration(duration);
-  //     console.log("📏 Metadata loaded, duration =", duration);
-
-  //     video.play().then(() => {
-  //       console.log("▶️ Auto-play started");
-  //       setIsPlaying(true);
-  //       setVideoStartTime(Date.now());
-  //     }).catch(err => {
-  //       console.warn("🔇 Auto-play failed:", err);
-  //     });
-  //   };
-
-  //   video.addEventListener("timeupdate", handleTimeUpdate);
-  //   video.addEventListener("ended", handleVideoEnd);
-  //   video.addEventListener("loadedmetadata", handleLoadedMetadata);
-
-  //   return () => {
-  //     console.log("♻️ Cleaning up video event listeners");
-  //     video.removeEventListener("timeupdate", handleTimeUpdate);
-  //     video.removeEventListener("ended", handleVideoEnd);
-  //     video.removeEventListener("loadedmetadata", handleLoadedMetadata);
-  //   };
-  // }, [currentVideoIndex]);
-
-
-
-
-  // new version 2:
-
-
   // This is the useEffect from Step 2
   useEffect(() => {
     handleVideoCompleteRef.current = handleVideoComplete;
@@ -489,7 +298,8 @@ const handleVideoComplete = useCallback(() => {
   const fetchVideos = useCallback(async () => {
     try {
       setIsLoading(true);
-      const response = await axios.get('/api/videos');
+      const url = examCode ? `/api/videos?examCode=${encodeURIComponent(examCode)}` : '/api/videos';
+      const response = await axios.get(url);
 
       if (response.data.success) {
         setVideos(response.data.videos);
@@ -503,7 +313,7 @@ const handleVideoComplete = useCallback(() => {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [examCode]);
 
   const handleSpacebarPress = () => {
     if (!isPlaying || !videoStartTime) return;
@@ -674,6 +484,7 @@ const handleVideoComplete = useCallback(() => {
       await axios.post('/api/responses', {
         operatorId,
         sessionId,
+        examCode,
         ...response
       });
     } catch (error) {
@@ -754,7 +565,8 @@ const handleVideoComplete = useCallback(() => {
         sessionId,
         status: 'Submitted',
         endTime: new Date().toISOString(),
-        totalScore: totalScore
+        totalScore: totalScore,
+        examCode
       });
       console.log('✅ Exam marked as Submitted');
     } catch (error) {

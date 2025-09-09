@@ -68,19 +68,63 @@ router.get('/operators/:id', async (req, res) => {
   }
 });
 
-// Get active videos from QuestionBank
+// Validate exam code
+router.post('/validate-exam-code', async (req, res) => {
+  try {
+    const { examCode, operatorId } = req.body;
+    
+    if (!examCode) {
+      return res.status(400).json({
+        success: false,
+        error: 'Exam code is required'
+      });
+    }
+
+    console.log('🔍 Validating exam code:', { examCode, operatorId });
+    
+    // Check if exam code exists in QuestionBank
+    const isValid = await sheetsService.validateExamCode(examCode.trim());
+    
+    if (isValid) {
+      res.json({
+        success: true,
+        message: 'Exam code is valid',
+        examCode: examCode.trim(),
+        operatorId: operatorId
+      });
+    } else {
+      res.json({
+        success: false,
+        error: 'Invalid exam code',
+        message: 'The provided exam code was not found in the system'
+      });
+    }
+  } catch (error) {
+    console.error('❌ Error validating exam code:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error during exam code validation',
+      message: error.message
+    });
+  }
+});
+
+// Get active videos from QuestionBank (filtered by exam code)
 router.get('/videos', async (req, res) => {
   try {
-    console.log('🎥 API: Fetching active videos...');
+    const { examCode } = req.query;
     
-    const videos = await sheetsService.getActiveVideos();
+    console.log('🎥 API: Fetching active videos...', { examCode });
+    
+    const videos = await sheetsService.getActiveVideos(examCode);
     
     if (!videos || videos.length === 0) {
       return res.json({
         success: true,
-        message: 'No active videos found',
+        message: examCode ? `No active videos found for exam code: ${examCode}` : 'No active videos found',
         videos: [],
-        totalCount: 0
+        totalCount: 0,
+        examCode: examCode
       });
     }
 
@@ -89,9 +133,10 @@ router.get('/videos', async (req, res) => {
 
     res.json({
       success: true,
-      message: `Found ${videos.length} active videos`,
+      message: `Found ${videos.length} active videos${examCode ? ` for exam code: ${examCode}` : ''}`,
       videos: shuffledVideos,
       totalCount: videos.length,
+      examCode: examCode,
       metadata: {
         interventionClips: videos.filter(v => v.hasIntervention).length,
         nonInterventionClips: videos.filter(v => !v.hasIntervention).length,
@@ -122,7 +167,8 @@ router.post('/responses', async (req, res) => {
       score,
       videoStartTime,
       sessionId,
-      examId 
+      examId,
+      examCode 
     } = req.body;
 
     // Validate required fields
@@ -155,7 +201,8 @@ router.post('/responses', async (req, res) => {
       userPressTime,
       reactionTime,
       score,
-      sessionId
+      sessionId,
+      examCode
     });
 
     res.json({
@@ -210,7 +257,7 @@ router.post('/process-video-links', async (req, res) => {
 // Rules acceptance and Exam_Results sheet setup
 router.post('/accept-rules', async (req, res) => {
   try {
-    const { operatorId } = req.body;
+    const { operatorId, examCode } = req.body;
     
     if (!operatorId) {
       return res.status(400).json({
@@ -219,15 +266,23 @@ router.post('/accept-rules', async (req, res) => {
       });
     }
     
-    console.log('📋 Rules accepted by operator:', operatorId);
+    if (!examCode) {
+      return res.status(400).json({
+        success: false,
+        error: 'Exam Code is required'
+      });
+    }
     
-    // Trigger Exam_Results sheet update
-    const result = await sheetsService.setupExamResultsSheet();
+    console.log('📋 Rules accepted by operator:', { operatorId, examCode });
+    
+    // Trigger Exam_Results sheet update with exam code filtering
+    const result = await sheetsService.setupExamResultsSheet(examCode);
     
     res.json({
       success: true,
       message: 'Rules accepted and Exam_Results sheet updated',
       operatorId,
+      examCode,
       examResultsSetup: result,
       timestamp: new Date().toISOString()
     });
@@ -249,7 +304,8 @@ router.post('/update-exam-status', async (req, res) => {
       sessionId, 
       status, 
       endTime, 
-      totalScore 
+      totalScore,
+      examCode 
     } = req.body;
 
     // Validate required fields
@@ -266,6 +322,7 @@ router.post('/update-exam-status', async (req, res) => {
       status,
       endTime,
       totalScore,
+      examCode,
       timestamp: new Date().toISOString()
     });
 
@@ -275,7 +332,8 @@ router.post('/update-exam-status', async (req, res) => {
       sessionId,
       status,
       endTime,
-      totalScore
+      totalScore,
+      examCode
     });
 
     res.json({

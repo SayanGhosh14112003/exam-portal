@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 
-const RulesSection = ({ operatorId, onProceedToExam }) => {
+const RulesSection = ({ operatorId, examCode, onProceedToExam }) => {
   const [hasAgreed, setHasAgreed] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -68,7 +68,8 @@ const RulesSection = ({ operatorId, onProceedToExam }) => {
       console.log('📋 Accepting rules and setting up Exam_Results sheet...');
       
       const response = await axios.post('/api/accept-rules', {
-        operatorId: operatorId
+        operatorId: operatorId,
+        examCode: examCode
       });
       
       if (response.data.success) {
@@ -112,11 +113,21 @@ const RulesSection = ({ operatorId, onProceedToExam }) => {
         <p className="text-lg text-gray-600">
           Please read all instructions carefully before proceeding
         </p>
-        <div className="mt-4 inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
-          <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
-            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-          </svg>
-          Operator: {operatorId}
+        <div className="mt-4 flex flex-wrap justify-center gap-2">
+          <div className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
+            <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+            </svg>
+            Operator: {operatorId}
+          </div>
+          {examCode && (
+            <div className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
+              <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" clipRule="evenodd" />
+              </svg>
+              Exam Code: {examCode}
+            </div>
+          )}
         </div>
       </div>
 
