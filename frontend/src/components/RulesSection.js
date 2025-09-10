@@ -67,7 +67,7 @@ const RulesSection = ({ operatorId, examCode, onProceedToExam }) => {
       // Call backend API to accept rules and setup Exam_Results sheet
       console.log('📋 Accepting rules and setting up Exam_Results sheet...');
       
-      const response = await axios.post('/api/accept-rules', {
+      const response = await axios.post('http://localhost:5001/api/accept-rules', {
         operatorId: operatorId,
         examCode: examCode
       });

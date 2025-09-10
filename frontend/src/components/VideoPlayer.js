@@ -5,7 +5,7 @@ import axios from 'axios';
 
 
 
-
+//changes made from here
 const VideoPlayer = ({ operatorId, examCode, onExamComplete }) => {
   const [videos, setVideos] = useState([]);
   const [currentVideoIndex, setCurrentVideoIndex] = useState(0);
@@ -21,17 +21,18 @@ const VideoPlayer = ({ operatorId, examCode, onExamComplete }) => {
   const [spacebarPressed, setSpacebarPressed] = useState(false);
   const [showNextButton, setShowNextButton] = useState(false);
   const [viewedVideos, setViewedVideos] = useState(new Set()); // Track which videos have been viewed
-
+  const [viewedResPonse,setViewedResponse]=useState(new Set()); 
   const videoRef = useRef(null);
   const spacebarPressTime = useRef(null);
   const hasUserResponded = useRef(false);
 
 
-const handleVideoComplete = useCallback(() => {
+const handleVideoComplete = useCallback(async() => {
+  console.log("handle")
   const currentVideo = getCurrentVideo();
   console.log(`🎬 Video completed: ${currentVideo?.videoTitle} (${currentVideo?.clipId}) - Index: ${currentVideoIndex}`);
   
-  // Prevent duplicate completion calls for the same video
+//  Prevent duplicate completion calls for the same video
   if (showNextButton) {
     console.log("⚠️ Video already completed, skipping duplicate call");
     return;
@@ -68,9 +69,11 @@ const handleVideoComplete = useCallback(() => {
 
   console.log(`📝 Creating response for ${currentVideo.clipId}:`, response);
 
-  setResponses(prev => [...prev, response]);
-  submitResponse(response);
-
+  if(!viewedResPonse.has(response))setResponses(prev => [...prev, response]);
+  setViewedResponse(prev=>new Set(prev).add(response));
+  console.log(response)//<=remove this
+  await submitResponse(response);
+  
   // Show the Next Video button - user must manually proceed
   // This ensures users don't accidentally skip videos
 
@@ -96,8 +99,11 @@ const handleVideoComplete = useCallback(() => {
 
 
   // Fetch videos on component mount
-  useEffect(() => {
+  useEffect(() => { 
     fetchVideos();
+  },[])
+  useEffect(() => {
+
 
     // Handle early exit detection
     const handleBeforeUnload = async (event) => {
@@ -113,7 +119,7 @@ const handleVideoComplete = useCallback(() => {
             totalScore: responses.reduce((sum, r) => sum + r.score, 0)
           });
 
-          navigator.sendBeacon('/api/update-exam-status', data);
+          navigator.sendBeacon('http://localhost:5001/api/update-exam-status', data);
           console.log('⚠️ Exam marked as Attempted (early exit detected)');
         } catch (error) {
           console.error('Failed to mark exam as attempted:', error);
@@ -298,11 +304,11 @@ const handleVideoComplete = useCallback(() => {
   const fetchVideos = useCallback(async () => {
     try {
       setIsLoading(true);
-      const url = examCode ? `/api/videos?examCode=${encodeURIComponent(examCode)}` : '/api/videos';
+      const url = examCode ? `http://localhost:5001/api/videos?examCode=${encodeURIComponent(examCode)}` : 'http://localhost:5001/api/videos';
       const response = await axios.get(url);
 
       if (response.data.success) {
-        setVideos(response.data.videos);
+        if(!videos.length)setVideos(response.data.videos);
         console.log('📹 Loaded videos:', response.data.videos);
       } else {
         setError('Failed to load videos');
@@ -316,7 +322,7 @@ const handleVideoComplete = useCallback(() => {
   }, [examCode]);
 
   const handleSpacebarPress = () => {
-    if (!isPlaying || !videoStartTime) return;
+    if (!isPlaying || !videoStartTime || hasUserResponded.current) return;
 
     const pressTime = Date.now();
     const videoTime = (pressTime - videoStartTime) / 1000; // Convert to seconds
@@ -481,7 +487,7 @@ const handleVideoComplete = useCallback(() => {
 
   const submitResponse = async (response) => {
     try {
-      await axios.post('/api/responses', {
+      await axios.post('http://localhost:5001/api/responses', {
         operatorId,
         sessionId,
         examCode,
@@ -492,7 +498,8 @@ const handleVideoComplete = useCallback(() => {
     }
   };
 
-  const moveToNextVideo = () => {
+  const moveToNextVideo = async() => {
+    await handleVideoComplete();
     // Clean up current video state
     if (window.videoInterval) {
       clearInterval(window.videoInterval);
@@ -560,7 +567,7 @@ const handleVideoComplete = useCallback(() => {
 
     // Mark exam as "Submitted" when all clips are completed
     try {
-      await axios.post('/api/update-exam-status', {
+      await axios.post('http://localhost:5001/api/update-exam-status', {
         operatorId,
         sessionId,
         status: 'Submitted',
