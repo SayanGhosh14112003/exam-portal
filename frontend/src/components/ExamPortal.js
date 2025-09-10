@@ -13,6 +13,8 @@ const ExamPortal = ({ operatorId, examCode, onExamComplete }) => {
   const handleExamComplete = (results) => {
     setExamResults(results);
     setExamState('completed');
+    console.log("results")
+    console.log(results)
     onExamComplete(results);
   };
 

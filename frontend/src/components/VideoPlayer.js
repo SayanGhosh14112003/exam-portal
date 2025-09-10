@@ -9,7 +9,7 @@ import axios from 'axios';
 const VideoPlayer = ({ operatorId, examCode, onExamComplete }) => {
   const [videos, setVideos] = useState([]);
   const [currentVideoIndex, setCurrentVideoIndex] = useState(0);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -25,8 +25,7 @@ const VideoPlayer = ({ operatorId, examCode, onExamComplete }) => {
   const videoRef = useRef(null);
   const spacebarPressTime = useRef(null);
   const hasUserResponded = useRef(false);
-
-
+  const res=useRef(null);
 const handleVideoComplete = useCallback(async() => {
   console.log("handle")
   const currentVideo = getCurrentVideo();
@@ -69,10 +68,18 @@ const handleVideoComplete = useCallback(async() => {
 
   console.log(`📝 Creating response for ${currentVideo.clipId}:`, response);
 
-  if(!viewedResPonse.has(response))setResponses(prev => [...prev, response]);
-  setViewedResponse(prev=>new Set(prev).add(response));
-  console.log(response)//<=remove this
-  await submitResponse(response);
+  if(!viewedResPonse.has(response)){
+    res.current.push(response);
+    setResponses(res.current);
+    console.log(res.current)
+    setViewedResponse(prev=>new Set(prev).add(response));
+    console.log("saving...")
+    console.log(response.clipId)//<=remove this
+    await submitResponse(response);
+  }
+  else{
+    console.log("preventing duplicate response save")
+  }
   
   // Show the Next Video button - user must manually proceed
   // This ensures users don't accidentally skip videos
@@ -93,17 +100,13 @@ const handleVideoComplete = useCallback(async() => {
     }, [handleVideoComplete]);
 
 
-
-
-
-
-
   // Fetch videos on component mount
   useEffect(() => { 
     fetchVideos();
+    setResponses([]); // Reset responses on mount
+    res.current=[];
   },[])
   useEffect(() => {
-
 
     // Handle early exit detection
     const handleBeforeUnload = async (event) => {
@@ -499,6 +502,7 @@ const handleVideoComplete = useCallback(async() => {
   };
 
   const moveToNextVideo = async() => {
+    setIsLoading(true)
     await handleVideoComplete();
     // Clean up current video state
     if (window.videoInterval) {
@@ -538,8 +542,9 @@ const handleVideoComplete = useCallback(async() => {
     } else {
       // We're on the last video - complete the exam
       console.log('🏁 On last video, completing exam');
-      handleExamComplete();
+      await handleExamComplete();
     }
+    setIsLoading(false);
   };
 
   const [examSubmitted, setExamSubmitted] = useState(false);
@@ -627,7 +632,7 @@ const handleVideoComplete = useCallback(async() => {
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto mb-4"></div>
-          <p className="text-lg text-gray-600">Loading examination videos...</p>
+          <p className="text-lg text-gray-600">Loading.....</p>
         </div>
       </div>
     );
@@ -932,6 +937,8 @@ const handleVideoComplete = useCallback(async() => {
               </div>
 
               <div className="text-center">
+              {!hasUserResponded.current ?
+                <>
                 <div className={`border-2 rounded-lg px-6 py-3 mb-2 transition-all duration-150 ${spacebarPressed
                   ? 'bg-green-500 border-green-600 scale-110 shadow-lg'
                   : 'bg-red-100 border-red-300'
@@ -944,6 +951,10 @@ const handleVideoComplete = useCallback(async() => {
                 <p className="text-sm text-gray-700 font-medium">
                   {spacebarPressed ? '🚨 PRESSED!' : 'Press when intervention needed'}
                 </p>
+                {/* Show if user has responded for this video */}
+                </>:null
+
+              } 
                 {hasUserResponded.current && (
                   <p className="text-xs text-green-600 mt-1">✓ Response recorded this video</p>
                 )}
