@@ -6,6 +6,7 @@ class GoogleSheetsService {
     this.sheets = null;
     this.spreadsheetId = process.env.GOOGLE_SHEETS_SPREADSHEET_ID;
     this.examResultsSpreadsheetId = process.env.EXAM_RESULTS_SPREADSHEET_ID || '16Z0UWUup7zk3Rw2rOXXCW16o8XzNyrDVXNtt0EP7r0s';
+    this.adminSpreadsheetId = '1V4nxJwWUBXns8Z9FxUoNAzjnKcXr7pJh2jydOXyuZs4';
     this.credentialsPath = '/Users/apple/Documents/Apis/sheet-api.json';
     this.initialize();
   }
@@ -892,6 +893,488 @@ class GoogleSheetsService {
 
     } catch (error) {
       console.error('❌ Error updating exam status:', error);
+      throw error;
+    }
+  }
+
+  // Admin Panel Methods
+  async getActiveExamCodes() {
+    try {
+      if (!this.sheets || !this.spreadsheetId) {
+        console.log('⚠️ Google Sheets not available - returning demo exam codes');
+        return ['DEMO', 'TEST', 'SAMPLE'];
+      }
+
+      console.log('🔍 Fetching active exam codes from QuestionBank...');
+
+      // Fetch exam codes from QuestionBank worksheet
+      const response = await this.sheets.spreadsheets.values.get({
+        spreadsheetId: this.spreadsheetId,
+        range: 'Sheet1!A:E', // Exam_Code to Is_Active columns
+      });
+
+      const rows = response.data.values || [];
+      if (rows.length <= 1) {
+        console.log('📋 No data found in QuestionBank');
+        return [];
+      }
+
+      // Extract unique exam codes from active rows
+      const examCodes = new Set();
+      rows.slice(1).forEach(row => {
+        const examCode = row[0];
+        const isActive = row[4] && (
+          row[4].toString().toUpperCase() === 'YES' ||
+          row[4].toString().toUpperCase() === 'TRUE' ||
+          row[4] === true
+        );
+        
+        if (examCode && isActive) {
+          examCodes.add(examCode);
+        }
+      });
+
+      const uniqueExamCodes = Array.from(examCodes);
+      console.log(`✅ Found ${uniqueExamCodes.length} active exam codes:`, uniqueExamCodes);
+      
+      return uniqueExamCodes;
+    } catch (error) {
+      console.error('❌ Error fetching active exam codes:', error);
+      throw error;
+    }
+  }
+
+  async getExamDetails(examCode) {
+    try {
+      if (!this.sheets || !this.spreadsheetId) {
+        console.log('⚠️ Google Sheets not available - returning demo exam details');
+        return {
+          examCode: examCode,
+          clips: [
+            {
+              clipId: 'DEMO_001',
+              hasIntervention: false,
+              correctTime: 15.5,
+              isActive: true,
+              fireBaseLink: 'https://example.com/video1.mp4'
+            }
+          ],
+          totalClips: 1,
+          activeClips: 1
+        };
+      }
+
+      console.log('🔍 Fetching exam details for:', examCode);
+
+      // Fetch all data from QuestionBank
+      const response = await this.sheets.spreadsheets.values.get({
+        spreadsheetId: this.spreadsheetId,
+        range: 'Sheet1!A:F', // All columns
+      });
+
+      const rows = response.data.values || [];
+      if (rows.length <= 1) {
+        return { examCode, clips: [], totalClips: 0, activeClips: 0 };
+      }
+
+      // Filter rows for this exam code
+      const examClips = rows.slice(1)
+        .filter(row => row[0] && row[0].toLowerCase() === examCode.toLowerCase())
+        .map(row => {
+          // Parse correct time
+          let correctTime = null;
+          if (row[3]) {
+            const timeStr = row[3].toString().trim();
+            if (timeStr.includes(':')) {
+              const [minutes, seconds] = timeStr.split(':').map(Number);
+              correctTime = (minutes * 60) + seconds;
+            } else if (timeStr !== '') {
+              correctTime = parseFloat(timeStr);
+            }
+          }
+
+          const isActive = row[4] && (
+            row[4].toString().toUpperCase() === 'YES' ||
+            row[4].toString().toUpperCase() === 'TRUE' ||
+            row[4] === true
+          );
+
+          return {
+            clipId: row[1] || '',
+            hasIntervention: row[2] && (row[2].toString().toUpperCase() === 'TRUE' || row[2] === true),
+            correctTime: correctTime,
+            isActive: isActive,
+            fireBaseLink: row[5] || ''
+          };
+        });
+
+      const activeClips = examClips.filter(clip => clip.isActive).length;
+
+      console.log(`✅ Found ${examClips.length} clips for exam ${examCode} (${activeClips} active)`);
+
+      return {
+        examCode: examCode,
+        clips: examClips,
+        totalClips: examClips.length,
+        activeClips: activeClips
+      };
+    } catch (error) {
+      console.error('❌ Error fetching exam details:', error);
+      throw error;
+    }
+  }
+
+  async deleteExam(examCode) {
+    try {
+      if (!this.sheets || !this.spreadsheetId) {
+        throw new Error('Google Sheets service not properly initialized');
+      }
+
+      console.log('🗑️ Deleting exam:', examCode);
+
+      // Get all data from QuestionBank
+      const response = await this.sheets.spreadsheets.values.get({
+        spreadsheetId: this.spreadsheetId,
+        range: 'Sheet1!A:F',
+      });
+
+      const rows = response.data.values || [];
+      if (rows.length <= 1) {
+        return { deletedCount: 0 };
+      }
+
+      // Find rows to delete (matching exam code)
+      const rowsToDelete = [];
+      for (let i = 1; i < rows.length; i++) {
+        if (rows[i][0] && rows[i][0].toLowerCase() === examCode.toLowerCase()) {
+          rowsToDelete.push(i + 1); // 1-based row index
+        }
+      }
+
+      if (rowsToDelete.length === 0) {
+        console.log(`⚠️ No rows found for exam code: ${examCode}`);
+        return { deletedCount: 0 };
+      }
+
+      // Delete rows in reverse order to maintain correct indices
+      for (let i = rowsToDelete.length - 1; i >= 0; i--) {
+        const rowIndex = rowsToDelete[i];
+        await this.sheets.spreadsheets.batchUpdate({
+          spreadsheetId: this.spreadsheetId,
+          resource: {
+            requests: [{
+              deleteDimension: {
+                range: {
+                  sheetId: 0, // Assuming first sheet
+                  dimension: 'ROWS',
+                  startIndex: rowIndex - 1, // 0-based for API
+                  endIndex: rowIndex // 0-based for API
+                }
+              }
+            }]
+          }
+        });
+      }
+
+      console.log(`✅ Deleted ${rowsToDelete.length} rows for exam: ${examCode}`);
+      return { deletedCount: rowsToDelete.length };
+    } catch (error) {
+      console.error('❌ Error deleting exam:', error);
+      throw error;
+    }
+  }
+
+  async createExam(examCode, clips) {
+    try {
+      if (!this.sheets || !this.spreadsheetId) {
+        throw new Error('Google Sheets service not properly initialized');
+      }
+
+      console.log('➕ Creating new exam:', examCode, 'with', clips.length, 'clips');
+
+      // Prepare rows for insertion
+      const newRows = clips.map(clip => [
+        examCode, // Exam_Code
+        clip.clipId || '', // Clip_ID
+        clip.hasIntervention ? 'TRUE' : 'FALSE', // Has_Intervention
+        clip.correctTime || '', // Correct_Time
+        clip.isActive !== false ? 'TRUE' : 'FALSE', // Is_Active (default to true)
+        clip.fireBaseLink || '' // Fire_Base_Link
+      ]);
+
+      // Append rows to QuestionBank
+      await this.sheets.spreadsheets.values.append({
+        spreadsheetId: this.spreadsheetId,
+        range: 'Sheet1!A:F',
+        valueInputOption: 'RAW',
+        resource: {
+          values: newRows
+        }
+      });
+
+      console.log(`✅ Created exam ${examCode} with ${newRows.length} clips`);
+      return { createdCount: newRows.length };
+    } catch (error) {
+      console.error('❌ Error creating exam:', error);
+      throw error;
+    }
+  }
+
+  async updateExam(examCode, clips) {
+    try {
+      if (!this.sheets || !this.spreadsheetId) {
+        throw new Error('Google Sheets service not properly initialized');
+      }
+
+      console.log('✏️ Updating exam:', examCode, 'with', clips.length, 'clips');
+
+      // First delete existing exam
+      await this.deleteExam(examCode);
+
+      // Then create with new data
+      const result = await this.createExam(examCode, clips);
+
+      console.log(`✅ Updated exam ${examCode} with ${result.createdCount} clips`);
+      return { updatedCount: result.createdCount };
+    } catch (error) {
+      console.error('❌ Error updating exam:', error);
+      throw error;
+    }
+  }
+
+  async getExamResultsAnalysis(examCode = null) {
+    try {
+      if (!this.sheets || !this.examResultsSpreadsheetId) {
+        console.log('⚠️ Google Sheets not available - returning demo analysis');
+        return {
+          totalAttempts: 10,
+          completedAttempts: 8,
+          inProgressAttempts: 2,
+          averageScore: 75.5,
+          examCodes: ['DEMO', 'TEST'],
+          attempts: []
+        };
+      }
+
+      console.log('📊 Fetching exam results analysis...', { examCode });
+
+      // Get all data from Exam_Results sheet
+      const response = await this.sheets.spreadsheets.values.get({
+        spreadsheetId: this.examResultsSpreadsheetId,
+        range: 'Sheet1!A:Z',
+      });
+
+      const rows = response.data.values || [];
+      if (rows.length <= 1) {
+        return {
+          totalAttempts: 0,
+          completedAttempts: 0,
+          inProgressAttempts: 0,
+          averageScore: 0,
+          examCodes: [],
+          attempts: []
+        };
+      }
+
+      const headers = rows[0];
+      const dataRows = rows.slice(1);
+
+      // Filter by exam code if provided
+      const filteredRows = examCode 
+        ? dataRows.filter(row => row[0] && row[0].toLowerCase() === examCode.toLowerCase())
+        : dataRows;
+
+      // Analyze the data
+      const analysis = {
+        totalAttempts: filteredRows.length,
+        completedAttempts: 0,
+        inProgressAttempts: 0,
+        attemptedAttempts: 0,
+        averageScore: 0,
+        examCodes: [...new Set(dataRows.map(row => row[0]).filter(Boolean))],
+        attempts: []
+      };
+
+      let totalScore = 0;
+      let scoredAttempts = 0;
+
+      filteredRows.forEach(row => {
+        const examCodeCol = row[0] || '';
+        const userIdCol = row[1] || '';
+        const startTimeCol = row[2] || '';
+        const endTimeCol = row[3] || '';
+        const totalScoreCol = parseFloat(row[4]) || 0;
+        const statusCol = row[5] || '';
+
+        // Count by status
+        if (statusCol === 'Submitted') {
+          analysis.completedAttempts++;
+        } else if (statusCol === 'In Progress') {
+          analysis.inProgressAttempts++;
+        } else if (statusCol === 'Attempted') {
+          analysis.attemptedAttempts++;
+        }
+
+        // Calculate average score for completed attempts
+        if (statusCol === 'Submitted' && totalScoreCol > 0) {
+          totalScore += totalScoreCol;
+          scoredAttempts++;
+        }
+
+        // Individual attempt data
+        analysis.attempts.push({
+          examCode: examCodeCol,
+          userId: userIdCol,
+          startTime: startTimeCol,
+          endTime: endTimeCol,
+          totalScore: totalScoreCol,
+          status: statusCol
+        });
+      });
+
+      analysis.averageScore = scoredAttempts > 0 ? (totalScore / scoredAttempts) : 0;
+
+      console.log(`✅ Analysis complete: ${analysis.totalAttempts} total attempts`);
+      return analysis;
+    } catch (error) {
+      console.error('❌ Error fetching exam results analysis:', error);
+      throw error;
+    }
+  }
+
+  async deleteClip(clipId) {
+    try {
+      if (!this.sheets || !this.spreadsheetId) {
+        throw new Error('Google Sheets service not properly initialized');
+      }
+
+      console.log('🗑️ Deleting clip:', clipId);
+
+      // Get all data from QuestionBank
+      const response = await this.sheets.spreadsheets.values.get({
+        spreadsheetId: this.spreadsheetId,
+        range: 'Sheet1!A:F',
+      });
+
+      const rows = response.data.values || [];
+      if (rows.length <= 1) {
+        return { deletedCount: 0 };
+      }
+
+      // Find row to delete (matching clip ID)
+      let rowToDelete = -1;
+      for (let i = 1; i < rows.length; i++) {
+        if (rows[i][1] && rows[i][1].toLowerCase() === clipId.toLowerCase()) { // Clip_ID is column B (index 1)
+          rowToDelete = i + 1; // 1-based row index
+          break;
+        }
+      }
+
+      if (rowToDelete === -1) {
+        console.log(`⚠️ No row found for clip ID: ${clipId}`);
+        return { deletedCount: 0 };
+      }
+
+      // Delete the row
+      await this.sheets.spreadsheets.batchUpdate({
+        spreadsheetId: this.spreadsheetId,
+        resource: {
+          requests: [{
+            deleteDimension: {
+              range: {
+                sheetId: 0, // Assuming first sheet
+                dimension: 'ROWS',
+                startIndex: rowToDelete - 1, // 0-based for API
+                endIndex: rowToDelete // 0-based for API
+              }
+            }
+          }]
+        }
+      });
+
+      console.log(`✅ Deleted clip: ${clipId}`);
+      return { deletedCount: 1 };
+    } catch (error) {
+      console.error('❌ Error deleting clip:', error);
+      throw error;
+    }
+  }
+
+  async addClipToExam(examCode, clipData) {
+    try {
+      if (!this.sheets || !this.spreadsheetId) {
+        throw new Error('Google Sheets service not properly initialized');
+      }
+
+      console.log('➕ Adding clip to exam:', examCode, clipData);
+
+      // Prepare row for insertion
+      const newRow = [
+        examCode, // Exam_Code
+        clipData.clipId || '', // Clip_ID
+        clipData.hasIntervention ? 'TRUE' : 'FALSE', // Has_Intervention
+        clipData.correctTime || '', // Correct_Time
+        'TRUE', // Is_Active (default to true)
+        clipData.fireBaseLink || '' // Fire_Base_Link
+      ];
+
+      // Append row to QuestionBank
+      await this.sheets.spreadsheets.values.append({
+        spreadsheetId: this.spreadsheetId,
+        range: 'Sheet1!A:F',
+        valueInputOption: 'RAW',
+        resource: {
+          values: [newRow]
+        }
+      });
+
+      console.log(`✅ Added clip ${clipData.clipId} to exam ${examCode}`);
+      return { addedCount: 1 };
+    } catch (error) {
+      console.error('❌ Error adding clip to exam:', error);
+      throw error;
+    }
+  }
+
+  async verifyAdminCredentials(adminId, password) {
+    try {
+      if (!this.sheets || !this.adminSpreadsheetId) {
+        throw new Error('Google Sheets service not properly initialized');
+      }
+
+      console.log('🔐 Verifying admin credentials for:', adminId);
+
+      // Get admin credentials from the admin spreadsheet
+      const response = await this.sheets.spreadsheets.values.get({
+        spreadsheetId: this.adminSpreadsheetId,
+        range: 'Sheet1!A:B', // Admin_Id and Password columns
+      });
+
+      const rows = response.data.values || [];
+      if (rows.length <= 1) {
+        console.log('⚠️ No admin credentials found in spreadsheet');
+        return { success: false, message: 'No admin credentials configured' };
+      }
+
+      // Find matching admin credentials
+      for (let i = 1; i < rows.length; i++) { // Skip header row
+        const [sheetAdminId, sheetPassword] = rows[i];
+        
+        if (sheetAdminId && sheetAdminId.trim() === adminId.trim() && 
+            sheetPassword && sheetPassword.trim() === password.trim()) {
+          console.log('✅ Admin credentials verified successfully');
+          return { 
+            success: true, 
+            message: 'Authentication successful',
+            adminId: sheetAdminId.trim()
+          };
+        }
+      }
+
+      console.log('❌ Invalid admin credentials');
+      return { success: false, message: 'Invalid Admin ID or Password' };
+    } catch (error) {
+      console.error('❌ Error verifying admin credentials:', error);
       throw error;
     }
   }

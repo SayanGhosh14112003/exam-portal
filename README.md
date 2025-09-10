@@ -110,19 +110,24 @@ The Exam Portal is designed for assessment scenarios where users watch video cli
    # See Environment Variables section below
    ```
 
-4. **Start the application**
+4. **Start the applications**
    ```bash
    # Start backend server (Terminal 1)
    cd backend
    npm start
    
-   # Start frontend server (Terminal 2)
+   # Start student exam portal (Terminal 2)
    cd frontend
+   npm start
+   
+   # Start admin panel (Terminal 3)
+   cd admin-panel
    npm start
    ```
 
-5. **Access the application**
-   - Frontend: http://localhost:3000
+5. **Access the applications**
+   - Student Portal: http://localhost:3000
+   - Admin Panel: http://localhost:3001 (Password: admin123)
    - Backend API: http://localhost:5001
 
 ## 🔧 Environment Variables
@@ -356,12 +361,20 @@ exam-portal/
 │   │   └── googleSheets.js
 │   ├── server.js
 │   └── package.json
-├── frontend/
+├── frontend/                    # Student Exam Portal
 │   ├── src/
 │   │   ├── components/
 │   │   │   ├── VideoPlayer.js
 │   │   │   ├── RulesSection.js
-│   │   │   └── ExamResults.js
+│   │   │   ├── ExamResults.js
+│   │   │   └── ExamPortal.js
+│   │   └── App.js
+│   └── package.json
+├── admin-panel/                 # Standalone Admin Panel
+│   ├── src/
+│   │   ├── components/
+│   │   │   ├── QuestionBankManagement.js
+│   │   │   └── ExamResultsAnalysis.js
 │   │   └── App.js
 │   └── package.json
 └── README.md
@@ -386,13 +399,36 @@ For support and questions:
 - Verify Google Sheets permissions and setup
 - Ensure all environment variables are correctly configured
 
+## 🔧 Admin Panel
+
+The system includes a **standalone admin panel** for managing exam content and monitoring results:
+
+### Features
+- **QuestionBank Management**: View, edit, delete exam codes and clips
+- **Results Analysis**: Comprehensive dashboard with exam statistics
+- **Real-time Data**: Live updates from Google Sheets
+- **Secure Access**: Password-protected admin interface
+
+### Access
+- **URL**: http://localhost:3001
+- **Password**: `admin123` (demo)
+- **Documentation**: See `admin-panel/README.md`
+
+### Key Capabilities
+- View all active exam codes from QuestionBank
+- Detailed exam information (clips, interventions, timing)
+- Delete entire exams with all associated clips
+- Analyze exam results with filtering and statistics
+- Monitor user performance and completion rates
+
 ## 🎯 Future Enhancements
 
-- [ ] Real-time analytics dashboard
-- [ ] Bulk exam management
-- [ ] Advanced reporting features
+- [ ] Admin panel: Create/Edit exam functionality
+- [ ] Advanced analytics with charts and graphs
+- [ ] Bulk exam management and import/export
 - [ ] Multi-language support
 - [ ] Mobile-responsive design improvements
+- [ ] Role-based admin access control
 - [ ] Automated testing suite
 - [ ] Performance monitoring
 - [ ] Data export functionality

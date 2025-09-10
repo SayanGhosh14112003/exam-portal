@@ -354,4 +354,298 @@ router.post('/update-exam-status', async (req, res) => {
   }
 });
 
+// Admin Panel Routes
+// Admin authentication
+router.post('/admin/auth', async (req, res) => {
+  try {
+    const { adminId, password } = req.body;
+    
+    if (!adminId || !password) {
+      return res.status(400).json({
+        success: false,
+        error: 'Admin ID and password are required'
+      });
+    }
+
+    console.log('🔐 Admin: Authentication attempt for:', adminId);
+    
+    const result = await sheetsService.verifyAdminCredentials(adminId, password);
+    
+    if (result.success) {
+      res.json({
+        success: true,
+        message: result.message,
+        adminId: result.adminId,
+        timestamp: new Date().toISOString()
+      });
+    } else {
+      res.status(401).json({
+        success: false,
+        error: result.message
+      });
+    }
+
+  } catch (error) {
+    console.error('❌ Admin: Error during authentication:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Authentication service error',
+      message: error.message
+    });
+  }
+});
+
+// Get all active exam codes from QuestionBank
+router.get('/admin/exam-codes', async (req, res) => {
+  try {
+    console.log('🔍 Admin: Fetching active exam codes...');
+    
+    const examCodes = await sheetsService.getActiveExamCodes();
+    
+    res.json({
+      success: true,
+      message: `Found ${examCodes.length} active exam codes`,
+      examCodes: examCodes,
+      totalCount: examCodes.length,
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error('❌ Admin: Error fetching exam codes:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to fetch exam codes',
+      message: error.message
+    });
+  }
+});
+
+// Get exam details by exam code
+router.get('/admin/exam/:examCode', async (req, res) => {
+  try {
+    const { examCode } = req.params;
+    
+    console.log('🔍 Admin: Fetching exam details for:', examCode);
+    
+    const examDetails = await sheetsService.getExamDetails(examCode);
+    
+    if (!examDetails || examDetails.clips.length === 0) {
+      return res.json({
+        success: false,
+        error: 'Exam not found',
+        message: `No exam found with code: ${examCode}`
+      });
+    }
+
+    res.json({
+      success: true,
+      message: `Found exam details for: ${examCode}`,
+      examCode: examCode,
+      examDetails: examDetails,
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error('❌ Admin: Error fetching exam details:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to fetch exam details',
+      message: error.message
+    });
+  }
+});
+
+// Delete an entire exam (all clips with the same exam code)
+router.delete('/admin/exam/:examCode', async (req, res) => {
+  try {
+    const { examCode } = req.params;
+    
+    console.log('🗑️ Admin: Deleting exam:', examCode);
+    
+    const result = await sheetsService.deleteExam(examCode);
+    
+    res.json({
+      success: true,
+      message: `Exam ${examCode} deleted successfully`,
+      examCode: examCode,
+      deletedCount: result.deletedCount,
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error('❌ Admin: Error deleting exam:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to delete exam',
+      message: error.message
+    });
+  }
+});
+
+// Create a new exam
+router.post('/admin/exam', async (req, res) => {
+  try {
+    const { examCode, clips } = req.body;
+    
+    if (!examCode || !clips || !Array.isArray(clips) || clips.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid exam data',
+        message: 'Exam code and clips array are required'
+      });
+    }
+
+    console.log('➕ Admin: Creating new exam:', examCode);
+    
+    const result = await sheetsService.createExam(examCode, clips);
+    
+    res.json({
+      success: true,
+      message: `Exam ${examCode} created successfully`,
+      examCode: examCode,
+      createdCount: result.createdCount,
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error('❌ Admin: Error creating exam:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to create exam',
+      message: error.message
+    });
+  }
+});
+
+// Update an existing exam
+router.put('/admin/exam/:examCode', async (req, res) => {
+  try {
+    const { examCode } = req.params;
+    const { clips } = req.body;
+    
+    if (!clips || !Array.isArray(clips)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid exam data',
+        message: 'Clips array is required'
+      });
+    }
+
+    console.log('✏️ Admin: Updating exam:', examCode);
+    
+    const result = await sheetsService.updateExam(examCode, clips);
+    
+    res.json({
+      success: true,
+      message: `Exam ${examCode} updated successfully`,
+      examCode: examCode,
+      updatedCount: result.updatedCount,
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error('❌ Admin: Error updating exam:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to update exam',
+      message: error.message
+    });
+  }
+});
+
+// Delete individual clip by Clip_ID
+router.delete('/admin/clip/:clipId', async (req, res) => {
+  try {
+    const { clipId } = req.params;
+    
+    console.log('🗑️ Admin: Deleting clip:', clipId);
+    
+    const result = await sheetsService.deleteClip(clipId);
+    
+    res.json({
+      success: true,
+      message: `Clip ${clipId} deleted successfully`,
+      clipId: clipId,
+      deletedCount: result.deletedCount,
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error('❌ Admin: Error deleting clip:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to delete clip',
+      message: error.message
+    });
+  }
+});
+
+// Add new clip to existing exam
+router.post('/admin/exam/:examCode/clip', async (req, res) => {
+  try {
+    const { examCode } = req.params;
+    const { clipId, hasIntervention, correctTime, fireBaseLink } = req.body;
+    
+    if (!clipId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Clip ID is required'
+      });
+    }
+
+    console.log('➕ Admin: Adding clip to exam:', examCode, clipId);
+    
+    const result = await sheetsService.addClipToExam(examCode, {
+      clipId,
+      hasIntervention: hasIntervention || false,
+      correctTime: correctTime || '',
+      fireBaseLink: fireBaseLink || ''
+    });
+    
+    res.json({
+      success: true,
+      message: `Clip ${clipId} added to exam ${examCode} successfully`,
+      examCode: examCode,
+      clipId: clipId,
+      addedCount: result.addedCount,
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error('❌ Admin: Error adding clip:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to add clip',
+      message: error.message
+    });
+  }
+});
+
+// Get exam results analysis
+router.get('/admin/results', async (req, res) => {
+  try {
+    const { examCode } = req.query;
+    
+    console.log('📊 Admin: Fetching exam results analysis...', { examCode });
+    
+    const resultsAnalysis = await sheetsService.getExamResultsAnalysis(examCode);
+    
+    res.json({
+      success: true,
+      message: examCode ? `Results analysis for exam: ${examCode}` : 'All exam results analysis',
+      examCode: examCode,
+      analysis: resultsAnalysis,
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error('❌ Admin: Error fetching results analysis:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to fetch results analysis',
+      message: error.message
+    });
+  }
+});
+
 module.exports = router;
