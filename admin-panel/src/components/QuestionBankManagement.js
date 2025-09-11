@@ -241,7 +241,7 @@ const QuestionBankManagement = () => {
       setLoading(true);
       setError('');
       
-      const response = await fetch(`${API_BASE_URL}/admin/clip/${clipToDelete}`, {
+      const response = await fetch(`${API_BASE_URL}/admin/clip/${selectedExam}/${clipToDelete}`, {
         method: 'DELETE'
       });
       const data = await response.json();
@@ -725,7 +725,7 @@ const QuestionBankManagement = () => {
                         </div>
                         <div className="flex items-center space-x-2">
                           {clip.fireBaseLink && (
-                            <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg className="w-4 h-4 text-blue-500 hover: cursor-pointer transition duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24" onClick={() => window.open(clip.fireBaseLink, '_blank')}>
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
                             </svg>
                           )}
@@ -1204,7 +1204,7 @@ const QuestionBankManagement = () => {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                           {clip.fireBaseLink ? (
-                            <div className="flex items-center">
+                            <div className="flex items-center hover: cursor-pointer transition duration-200" onClick={() => window.open(clip.fireBaseLink, '_blank')}>
                               <svg className="w-4 h-4 text-blue-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
                               </svg>
@@ -1344,7 +1344,7 @@ const QuestionBankManagement = () => {
 
       {/* Delete Clip Confirmation Modal */}
       {showDeleteClipModal && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-60">
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-[9999]">
           <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
             <div className="mt-3 text-center">
               <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100">

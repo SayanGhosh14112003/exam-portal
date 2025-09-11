@@ -4,16 +4,26 @@
   "description": "Online Exam System with React Frontend and Node.js Backend",
   "main": "index.js",
   "scripts": {
-    "dev": "concurrently \"npm run server\" \"npm run client\"",
+    "dev": "concurrently \"npm run server\" \"npm run client\" \"npm run admin\"",
     "server": "cd backend && npm run dev",
     "client": "cd frontend && npm start",
     "build": "cd frontend && npm run build",
-    "install-all": "npm install && cd frontend && npm install && cd ../backend && npm install"
+    "admin": "cd admin-panel && npm start",
+    "install-all": "npm install && cd frontend && npm install && cd ../backend && npm install && cd ../admin-panel && npm install"
   },
-  "keywords": ["exam", "portal", "react", "nodejs", "express"],
+  "keywords": [
+    "exam",
+    "portal",
+    "react",
+    "nodejs",
+    "express"
+  ],
   "author": "",
   "license": "MIT",
   "devDependencies": {
     "concurrently": "^8.2.2"
+  },
+  "dependencies": {
+    "install-all": "^1.1.0"
   }
 }

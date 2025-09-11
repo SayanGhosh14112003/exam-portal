@@ -1242,63 +1242,104 @@ class GoogleSheetsService {
     }
   }
 
-  async deleteClip(clipId) {
-    try {
-      if (!this.sheets || !this.spreadsheetId) {
-        throw new Error('Google Sheets service not properly initialized');
-      }
+async deleteQuestions(examCode, clipId) {
+  try {
+    if (!this.sheets || !this.spreadsheetId) {
+      console.log('⚠️ Google Sheets API or Spreadsheet ID not available');
+      return false;
+    }
 
-      console.log('🗑️ Deleting clip:', clipId);
+    console.log('🗑 Deleting rows based on Exam_Code and Clip_ID');
+    console.log('Exam_Code:', examCode, '| Clip_ID:', clipId);
 
-      // Get all data from QuestionBank
-      const response = await this.sheets.spreadsheets.values.get({
-        spreadsheetId: this.spreadsheetId,
-        range: 'Sheet1!A:F',
-      });
+    // Get all rows including headers
+    const response = await this.sheets.spreadsheets.values.get({
+      spreadsheetId: this.spreadsheetId,
+      range: 'Sheet1!A:F', // Adjust as needed
+    });
 
-      const rows = response.data.values || [];
-      if (rows.length <= 1) {
-        return { deletedCount: 0 };
-      }
+    const rows = response.data.values || [];
+    if (rows.length === 0) {
+      console.log('⚠️ No data found in the sheet');
+      return false;
+    }
 
-      // Find row to delete (matching clip ID)
-      let rowToDelete = -1;
-      for (let i = 1; i < rows.length; i++) {
-        if (rows[i][1] && rows[i][1].toLowerCase() === clipId.toLowerCase()) { // Clip_ID is column B (index 1)
-          rowToDelete = i + 1; // 1-based row index
-          break;
+    const header = rows[0];
+    const examCodeIndex = header.indexOf('Exam_Code');
+    const clipIdIndex = header.indexOf('Clip_ID');
+
+    if (examCodeIndex === -1 || clipIdIndex === -1) {
+      console.log('❌ Required columns not found');
+      return false;
+    }
+
+    // Find all row indices to delete
+    let rowsToDelete = [];
+
+    for (let i = 1; i < rows.length; i++) {
+      const row = rows[i];
+      const rowExamCode = row[examCodeIndex] || "";
+      const rowClipId = row[clipIdIndex] || "";
+
+      let shouldDelete = false;
+
+      if (!examCode && clipId) {
+        // Case 1: Exam_Code is empty and Clip_ID is provided
+        if (rowClipId === clipId) {
+          shouldDelete = true;
+        }
+      } else if (examCode && !clipId) {
+        // Case 2: Exam_Code is provided and Clip_ID is empty
+        if (rowExamCode === examCode) {
+          shouldDelete = true;
+        }
+      } else if (examCode && clipId) {
+        // Case 3: Both provided, match both
+        if (rowExamCode === examCode && rowClipId === clipId) {
+          shouldDelete = true;
         }
       }
 
-      if (rowToDelete === -1) {
-        console.log(`⚠️ No row found for clip ID: ${clipId}`);
-        return { deletedCount: 0 };
+      if (shouldDelete) {
+        rowsToDelete.push(i + 1); // Row numbers are 1-based and headers are in row 1
       }
+    }
 
-      // Delete the row
+    if (rowsToDelete.length === 0) {
+      console.log('⚠️ No matching rows found');
+      return false;
+    }
+
+    console.log(`✅ Found ${rowsToDelete.length} rows to delete`);
+
+    // Sort rows descending to delete without affecting indices
+    rowsToDelete.sort((a, b) => b - a);
+
+    for (let rowIndex of rowsToDelete) {
       await this.sheets.spreadsheets.batchUpdate({
         spreadsheetId: this.spreadsheetId,
         resource: {
           requests: [{
             deleteDimension: {
               range: {
-                sheetId: 0, // Assuming first sheet
-                dimension: 'ROWS',
-                startIndex: rowToDelete - 1, // 0-based for API
-                endIndex: rowToDelete // 0-based for API
+                sheetId: 0, // Replace with actual sheetId if needed
+                dimension: "ROWS",
+                startIndex: rowIndex - 1,
+                endIndex: rowIndex
               }
             }
           }]
         }
       });
-
-      console.log(`✅ Deleted clip: ${clipId}`);
-      return { deletedCount: 1 };
-    } catch (error) {
-      console.error('❌ Error deleting clip:', error);
-      throw error;
+      console.log(`Deleted row ${rowIndex}`);
     }
+
+    return true;
+  } catch (error) {
+    console.error('❌ Error deleting rows:', error);
+    throw error;
   }
+}
 
   async addClipToExam(examCode, clipData) {
     try {
@@ -1375,6 +1416,126 @@ class GoogleSheetsService {
       return { success: false, message: 'Invalid Admin ID or Password' };
     } catch (error) {
       console.error('❌ Error verifying admin credentials:', error);
+      throw error;
+    }
+  }
+
+  async createAdminCredentials(newAdminId, newPassword, createdBy) {
+    try {
+      if (!this.sheets || !this.adminSpreadsheetId) {
+        throw new Error('Google Sheets service not properly initialized');
+      }
+
+      console.log('➕ Creating admin credentials for:', newAdminId, 'by:', createdBy);
+
+      // First, check if admin ID already exists
+      const response = await this.sheets.spreadsheets.values.get({
+        spreadsheetId: this.adminSpreadsheetId,
+        range: 'Sheet1!A:D', // Admin_Id, Password, Created_At, Created_By columns
+      });
+
+      const rows = response.data.values || [];
+      
+      // Check for existing admin ID
+      for (let i = 1; i < rows.length; i++) { // Skip header row
+        const [sheetAdminId] = rows[i];
+        if (sheetAdminId && sheetAdminId.trim().toLowerCase() === newAdminId.trim().toLowerCase()) {
+          console.log('❌ Admin ID already exists');
+          return { success: false, message: 'Admin ID already exists' };
+        }
+      }
+
+      // Add new admin credentials
+      const newRow = [
+        newAdminId.trim(),
+        newPassword.trim(),
+        new Date().toISOString(),
+        createdBy.trim()
+      ];
+
+      await this.sheets.spreadsheets.values.append({
+        spreadsheetId: this.adminSpreadsheetId,
+        range: 'Sheet1!A:D',
+        valueInputOption: 'RAW',
+        resource: {
+          values: [newRow]
+        }
+      });
+
+      console.log('✅ Admin credentials created successfully');
+      return { 
+        success: true, 
+        message: 'Admin created successfully',
+        adminId: newAdminId.trim()
+      };
+    } catch (error) {
+      console.error('❌ Error creating admin credentials:', error);
+      throw error;
+    }
+  }
+
+  async deleteAdminCredentials(adminIdToDelete, deletedBy) {
+    try {
+      if (!this.sheets || !this.adminSpreadsheetId) {
+        throw new Error('Google Sheets service not properly initialized');
+      }
+
+      console.log('🗑️ Deleting admin credentials for:', adminIdToDelete, 'by:', deletedBy);
+
+      // Get all admin credentials to find the row to delete
+      const response = await this.sheets.spreadsheets.values.get({
+        spreadsheetId: this.adminSpreadsheetId,
+        range: 'Sheet1!A:D', // Admin_Id, Password, Created_At, Created_By columns
+      });
+
+      const rows = response.data.values || [];
+      if (rows.length <= 1) {
+        console.log('⚠️ No admin credentials found in spreadsheet');
+        return { success: false, message: 'No admin credentials found' };
+      }
+
+      // Find the admin to delete
+      let rowToDelete = -1;
+      for (let i = 1; i < rows.length; i++) { // Skip header row
+        const [sheetAdminId] = rows[i];
+        if (sheetAdminId && sheetAdminId.trim().toLowerCase() === adminIdToDelete.trim().toLowerCase()) {
+          rowToDelete = i + 1; // Google Sheets rows are 1-indexed
+          break;
+        }
+      }
+
+      if (rowToDelete === -1) {
+        console.log('❌ Admin ID not found:', adminIdToDelete);
+        return { success: false, message: 'Admin ID not found' };
+      }
+
+      // Delete the row
+      await this.sheets.spreadsheets.batchUpdate({
+        spreadsheetId: this.adminSpreadsheetId,
+        resource: {
+          requests: [
+            {
+              deleteDimension: {
+                range: {
+                  sheetId: 0, // Assuming the first sheet
+                  dimension: 'ROWS',
+                  startIndex: rowToDelete - 1, // 0-indexed for the API
+                  endIndex: rowToDelete // Exclusive end index
+                }
+              }
+            }
+          ]
+        }
+      });
+
+      console.log('✅ Admin credentials deleted successfully');
+      return { 
+        success: true, 
+        message: 'Admin deleted successfully',
+        adminId: adminIdToDelete.trim()
+      };
+    } catch (error) {
+      console.error('❌ Error deleting admin credentials:', error);
       throw error;
     }
   }

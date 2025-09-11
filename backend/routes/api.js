@@ -395,6 +395,101 @@ router.post('/admin/auth', async (req, res) => {
   }
 });
 
+// Create new admin
+router.post('/admin/create', async (req, res) => {
+  try {
+    const { newAdminId, newPassword, createdBy } = req.body;
+    
+    if (!newAdminId || !newPassword || !createdBy) {
+      return res.status(400).json({
+        success: false,
+        error: 'New admin ID, password, and creator ID are required'
+      });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({
+        success: false,
+        error: 'Password must be at least 6 characters long'
+      });
+    }
+
+    console.log('➕ Admin: Creating new admin:', newAdminId, 'by:', createdBy);
+    
+    const result = await sheetsService.createAdminCredentials(newAdminId, newPassword, createdBy);
+    
+    if (result.success) {
+      res.json({
+        success: true,
+        message: result.message,
+        adminId: result.adminId,
+        timestamp: new Date().toISOString()
+      });
+    } else {
+      res.status(400).json({
+        success: false,
+        error: result.message
+      });
+    }
+
+  } catch (error) {
+    console.error('❌ Admin: Error creating admin:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Admin creation service error',
+      message: error.message
+    });
+  }
+});
+
+// Delete admin
+router.delete('/admin/delete', async (req, res) => {
+  try {
+    const { adminIdToDelete, deletedBy } = req.body;
+    
+    if (!adminIdToDelete || !deletedBy) {
+      return res.status(400).json({
+        success: false,
+        error: 'Admin ID to delete and deleter ID are required'
+      });
+    }
+
+    // Prevent self-deletion
+    if (adminIdToDelete.trim().toLowerCase() === deletedBy.trim().toLowerCase()) {
+      return res.status(400).json({
+        success: false,
+        error: 'You cannot delete your own admin account'
+      });
+    }
+
+    console.log('🗑️ Admin: Deleting admin:', adminIdToDelete, 'by:', deletedBy);
+    
+    const result = await sheetsService.deleteAdminCredentials(adminIdToDelete, deletedBy);
+    
+    if (result.success) {
+      res.json({
+        success: true,
+        message: result.message,
+        adminId: result.adminId,
+        timestamp: new Date().toISOString()
+      });
+    } else {
+      res.status(400).json({
+        success: false,
+        error: result.message
+      });
+    }
+
+  } catch (error) {
+    console.error('❌ Admin: Error deleting admin:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Admin deletion service error',
+      message: error.message
+    });
+  }
+});
+
 // Get all active exam codes from QuestionBank
 router.get('/admin/exam-codes', async (req, res) => {
   try {
@@ -554,13 +649,13 @@ router.put('/admin/exam/:examCode', async (req, res) => {
 });
 
 // Delete individual clip by Clip_ID
-router.delete('/admin/clip/:clipId', async (req, res) => {
+router.delete('/admin/clip/:questionId/:clipId', async (req, res) => {
   try {
-    const { clipId } = req.params;
+    const { clipId,questionId } = req.params;
     
-    console.log('🗑️ Admin: Deleting clip:', clipId);
+    console.log('🗑️ Admin: Deleting clip:', questionId,clipId);
     
-    const result = await sheetsService.deleteClip(clipId);
+    const result = await sheetsService.deleteQuestions(questionId,clipId);
     
     res.json({
       success: true,
