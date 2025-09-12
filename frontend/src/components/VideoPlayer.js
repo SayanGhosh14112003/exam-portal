@@ -122,7 +122,7 @@ const handleVideoComplete = useCallback(async() => {
             totalScore: responses.reduce((sum, r) => sum + r.score, 0)
           });
 
-          navigator.sendBeacon('http://localhost:5001/api/update-exam-status', data);
+          navigator.sendBeacon('/api/update-exam-status', data);
           console.log('⚠️ Exam marked as Attempted (early exit detected)');
         } catch (error) {
           console.error('Failed to mark exam as attempted:', error);
@@ -307,7 +307,7 @@ const handleVideoComplete = useCallback(async() => {
   const fetchVideos = useCallback(async () => {
     try {
       setIsLoading(true);
-      const url = examCode ? `http://localhost:5001/api/videos?examCode=${encodeURIComponent(examCode)}` : 'http://localhost:5001/api/videos';
+      const url = examCode ? `/api/videos?examCode=${encodeURIComponent(examCode)}` : '/api/videos';
       const response = await axios.get(url);
 
       if (response.data.success) {
@@ -490,7 +490,7 @@ const handleVideoComplete = useCallback(async() => {
 
   const submitResponse = async (response) => {
     try {
-      await axios.post('http://localhost:5001/api/responses', {
+      await axios.post('/api/responses', {
         operatorId,
         sessionId,
         examCode,
@@ -572,7 +572,7 @@ const handleVideoComplete = useCallback(async() => {
 
     // Mark exam as "Submitted" when all clips are completed
     try {
-      await axios.post('http://localhost:5001/api/update-exam-status', {
+      await axios.post('/api/update-exam-status', {
         operatorId,
         sessionId,
         status: 'Submitted',

@@ -13,50 +13,29 @@ class GoogleSheetsService {
 
   async initialize() {
     try {
-      // Try to load credentials from JSON file first
       let credentials;
-      try {
-        const fs = require('fs');
-        if (fs.existsSync(this.credentialsPath)) {
-          console.log('📁 Loading Google Sheets credentials from JSON file...');
-          const credentialsFile = fs.readFileSync(this.credentialsPath, 'utf8');
-          credentials = JSON.parse(credentialsFile);
-          console.log('✅ Credentials loaded from JSON file');
-        } else {
-          throw new Error('Credentials file not found');
-        }
-      } catch (fileError) {
-        console.log('⚠️ Could not load credentials from JSON file, trying environment variables...');
-        
-        // Fallback to environment variables
         const hasCredentials = process.env.GOOGLE_CLIENT_EMAIL && 
                               process.env.GOOGLE_PRIVATE_KEY && 
                               process.env.GOOGLE_PROJECT_ID;
 
         if (!hasCredentials) {
-          console.log('⚠️ Google Sheets credentials not configured - running in demo mode');
-          console.log('📝 To enable Google Sheets integration, either:');
-          console.log('   1. Place credentials in: /Users/apple/Documents/Apis/sheet-api.json');
-          console.log('   2. Or configure environment variables');
           this.sheets = null;
           this.drive = null;
           return;
         }
-
         credentials = {
-          type: process.env.GOOGLE_SERVICE_ACCOUNT_TYPE || 'service_account',
+          type: process.env.GOOGLE_SERVICE_ACCOUNT_TYPE,
           project_id: process.env.GOOGLE_PROJECT_ID,
           private_key_id: process.env.GOOGLE_PRIVATE_KEY_ID,
           private_key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
           client_email: process.env.GOOGLE_CLIENT_EMAIL,
           client_id: process.env.GOOGLE_CLIENT_ID,
-          auth_uri: process.env.GOOGLE_AUTH_URI || 'https://accounts.google.com/o/oauth2/auth',
-          token_uri: process.env.GOOGLE_TOKEN_URI || 'https://oauth2.googleapis.com/token',
+          auth_uri: process.env.GOOGLE_AUTH_URI,
+          token_uri: process.env.GOOGLE_TOKEN_URI,
           auth_provider_x509_cert_url: process.env.GOOGLE_AUTH_PROVIDER_CERT_URL,
           client_x509_cert_url: process.env.GOOGLE_CLIENT_CERT_URL,
-          universe_domain: process.env.GOOGLE_UNIVERSE_DOMAIN || 'googleapis.com'
+          universe_domain: process.env.GOOGLE_UNIVERSE_DOMAIN 
         };
-      }
 
       const auth = new google.auth.GoogleAuth({
         credentials,
@@ -77,6 +56,90 @@ class GoogleSheetsService {
       this.drive = null;
     }
   }
+  //change
+  async deleteExamResult(userId, examCode, startTime) {
+  try {
+    if (!this.sheets || !this.examResultsSpreadsheetId) {
+      throw new Error('Google Sheets service not properly initialized');
+    }
+
+    console.log(`🗑️ Deleting row for userId: ${userId}, examCode: ${examCode}, startTime: ${startTime}`);
+
+    // Get all data from the sheet
+    const response = await this.sheets.spreadsheets.values.get({
+      spreadsheetId: this.examResultsSpreadsheetId,
+      range: 'Sheet1!A:G', // Adjust range as needed to include Start_Time
+    });
+
+    const rows = response.data.values || [];
+    if (rows.length <= 1) {
+      return { deletedCount: 0 };
+    }
+
+    const header = rows[0];
+    const userIdIndex = header.indexOf('User_ID');
+    const examCodeIndex = header.indexOf('Exam_Code');
+    const startTimeIndex = header.indexOf('Start_Time');
+
+    if (userIdIndex === -1 || examCodeIndex === -1 || startTimeIndex === -1) {
+      throw new Error('Required columns "User_ID", "Exam_Code", or "Start_Time" not found');
+    }
+
+    // Find rows to delete matching all three fields
+    const rowsToDelete = [];
+    for (let i = 1; i < rows.length; i++) {
+      const row = rows[i];
+      const currentUserId = row[userIdIndex];
+      const currentExamCode = row[examCodeIndex];
+      const currentStartTime = row[startTimeIndex];
+
+      if (
+        currentUserId && currentExamCode && currentStartTime &&
+        currentUserId.toLowerCase() === userId.toLowerCase() &&
+        currentExamCode.toLowerCase() === examCode.toLowerCase() &&
+        currentStartTime.toLowerCase() === startTime.toLowerCase()
+      ) {
+        rowsToDelete.push(i + 1); // store 1-based index
+      }
+    }
+
+    if (rowsToDelete.length === 0) {
+      console.log('⚠️ No matching row found');
+      return { deletedCount: 0 };
+    }
+
+    // Delete rows in reverse order
+    for (let i = rowsToDelete.length - 1; i >= 0; i--) {
+      const rowIndex = rowsToDelete[i];
+      await this.sheets.spreadsheets.batchUpdate({
+        spreadsheetId: this.examResultsSpreadsheetId,
+        resource: {
+          requests: [{
+            deleteDimension: {
+              range: {
+                sheetId: 0, // Adjust if using another sheet
+                dimension: 'ROWS',
+                startIndex: rowIndex - 1,
+                endIndex: rowIndex
+              }
+            }
+          }]
+        }
+      });
+    }
+
+    console.log(`✅ Deleted ${rowsToDelete.length} row(s) for userId: ${userId}, examCode: ${examCode}, startTime: ${startTime}`);
+    return { deletedCount: rowsToDelete.length };
+
+  } catch (error) {
+    console.error('❌ Error deleting row:', error);
+    throw error;
+  }
+}
+
+
+
+  //change
 
   async validateExamCode(examCode) {
     try {
@@ -1098,7 +1161,7 @@ class GoogleSheetsService {
         clip.clipId || '', // Clip_ID
         clip.hasIntervention ? 'TRUE' : 'FALSE', // Has_Intervention
         clip.correctTime || '', // Correct_Time
-        clip.isActive !== false ? 'TRUE' : 'FALSE', // Is_Active (default to true)
+        clip.isActive !== false ? 'Yes' : 'No', // Is_Active (default to true)
         clip.fireBaseLink || '' // Fire_Base_Link
       ]);
 
@@ -1216,7 +1279,7 @@ class GoogleSheetsService {
         }
 
         // Calculate average score for completed attempts
-        if (statusCol === 'Submitted' && totalScoreCol > 0) {
+        if (statusCol === 'Submitted' && totalScoreCol >= 0) {
           totalScore += totalScoreCol;
           scoredAttempts++;
         }
@@ -1355,7 +1418,7 @@ async deleteQuestions(examCode, clipId) {
         clipData.clipId || '', // Clip_ID
         clipData.hasIntervention ? 'TRUE' : 'FALSE', // Has_Intervention
         clipData.correctTime || '', // Correct_Time
-        'TRUE', // Is_Active (default to true)
+        'Yes', // Is_Active (default to true)
         clipData.fireBaseLink || '' // Fire_Base_Link
       ];
 

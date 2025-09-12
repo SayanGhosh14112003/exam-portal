@@ -63,7 +63,7 @@ const OperatorIDModal = ({ isOpen, onClose, onVerificationComplete }) => {
     
     try {
       // Validate exam code with backend
-      const response = await fetch('http://localhost:5001/api/validate-exam-code', {
+      const response = await fetch('/api/validate-exam-code', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

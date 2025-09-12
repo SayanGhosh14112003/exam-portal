@@ -8,16 +8,22 @@
     "dev": "nodemon server.js"
   },
   "dependencies": {
-    "express": "^4.18.2",
+    "body-parser": "^1.20.2",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
-    "googleapis": "^128.0.0",
-    "body-parser": "^1.20.2"
+    "exam-portal": "file:..",
+    "express": "^4.18.2",
+    "googleapis": "^128.0.0"
   },
   "devDependencies": {
     "nodemon": "^3.0.2"
   },
-  "keywords": ["express", "api", "exam", "google-sheets"],
+  "keywords": [
+    "express",
+    "api",
+    "exam",
+    "google-sheets"
+  ],
   "author": "",
   "license": "MIT"
 }

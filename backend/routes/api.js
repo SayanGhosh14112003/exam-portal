@@ -13,6 +13,35 @@ router.get('/test', (req, res) => {
 });
 
 // Operator routes
+router.delete('/admin/delete-result/:userId/:examCode/:startTime', async (req, res) => {
+  try {
+    const { userId, examCode,startTime } = req.params;
+    
+    if (!userId || !examCode || !startTime) {
+      return res.status(400).json({
+        success: false,
+        error: 'User ID and Exam Code are required'
+      });
+    }
+
+    console.log('🗑️ Admin: Deleting exam result for user:', userId, 'and exam code:', examCode)  ;
+    sheetsService.deleteExamResult(userId, examCode,startTime);
+    res.json({
+      success: true,
+      message: `Exam results for user ${userId} and exam code ${examCode} deleted successfully`,
+      userId,
+      examCode,
+      timestamp: new Date().toISOString()
+    });
+  }
+  catch(err){
+    console.error('Error fetching operator details:', error);
+    res.status(500).json({ 
+      error: 'Internal server error' 
+    });
+  }
+
+});
 router.post('/operators/verify', async (req, res) => {
   try {
     const { operatorId } = req.body;
