@@ -13,6 +13,20 @@ router.get('/test', (req, res) => {
 });
 
 // Operator routes
+router.delete('/admin/delete-all-results/:examCode',async(req,res)=>{
+  try{
+    const {examCode}=req.params;
+    if(!examCode)return res.status(400).json({success:false,error:'Exam Code field is mandatory'})
+    await sheetsService.deleteRecordsByExamCode(examCode);
+    return res.status(200).json({success:true,message:"Exam Results deleted successfully"})
+  }
+  catch(err){
+    return res.status(500).json({
+    success:false,
+    error:err.message || "Internal Server Error"
+    })
+  }
+})
 router.delete('/admin/delete-result/:userId/:examCode/:startTime', async (req, res) => {
   try {
     const { userId, examCode,startTime } = req.params;

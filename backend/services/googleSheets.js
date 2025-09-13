@@ -57,6 +57,88 @@ class GoogleSheetsService {
     }
   }
   //change
+  async deleteRecordsByExamCode(examCode) {
+  try {
+    if (!this.sheets || !this.examResultsSpreadsheetId) {
+      throw new Error('Google Sheets service not properly initialized');
+    }
+
+    console.log('🗑️ Deleting records for Exam_Code:', examCode);
+
+    // 1. Get the sheet ID
+    const sheetInfo = await this.sheets.spreadsheets.get({
+      spreadsheetId: this.examResultsSpreadsheetId,
+    });
+
+    const sheet = sheetInfo.data.sheets.find(s => s.properties.title === 'Sheet1');
+    if (!sheet) {
+      throw new Error('Sheet1 not found');
+    }
+    const sheetId = sheet.properties.sheetId;
+
+    // 2. Get all data from the spreadsheet
+    const response = await this.sheets.spreadsheets.values.get({
+      spreadsheetId: this.examResultsSpreadsheetId,
+      range: 'Sheet1!A:Z', // Adjust range if needed
+    });
+
+    const rows = response.data.values || [];
+    if (rows.length <= 1) {
+      console.log('⚠️ No data found or only header row present.');
+      return { deletedCount: 0 };
+    }
+
+    const header = rows[0];
+    const examCodeIndex = header.indexOf('Exam_Code');
+    if (examCodeIndex === -1) {
+      throw new Error('Exam_Code column not found');
+    }
+
+    // 3. Find rows to delete by Exam_Code
+    const rowsToDelete = [];
+    for (let i = 1; i < rows.length; i++) {
+      const cellValue = rows[i][examCodeIndex] || '';
+      if (cellValue.toLowerCase() === examCode.toLowerCase()) {
+        rowsToDelete.push(i + 1); // API expects 1-based row numbers
+      }
+    }
+
+    if (rowsToDelete.length === 0) {
+      console.log(`⚠️ No records found with Exam_Code = ${examCode}`);
+      return { deletedCount: 0 };
+    }
+
+    // 4. Delete rows in reverse order
+    for (let i = rowsToDelete.length - 1; i >= 0; i--) {
+      const rowIndex = rowsToDelete[i];
+      await this.sheets.spreadsheets.batchUpdate({
+        spreadsheetId: this.examResultsSpreadsheetId,
+        resource: {
+          requests: [{
+            deleteDimension: {
+              range: {
+                sheetId: sheetId,
+                dimension: 'ROWS',
+                startIndex: rowIndex - 1, // API expects 0-based index
+                endIndex: rowIndex
+              }
+            }
+          }]
+        }
+      });
+      console.log(`Deleted row ${rowIndex}`);
+    }
+
+    console.log(`✅ Deleted ${rowsToDelete.length} record(s) with Exam_Code = ${examCode}`);
+    return { deletedCount: rowsToDelete.length };
+
+  } catch (error) {
+    console.error('❌ Error deleting records:', error);
+    throw error;
+  }
+}
+
+
   async deleteExamResult(userId, examCode, startTime) {
   try {
     if (!this.sheets || !this.examResultsSpreadsheetId) {
